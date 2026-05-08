@@ -5,6 +5,7 @@ const APP_SHELL = [
   "./admin.html",
   "./styles.css",
   "./app.js",
+  "./backend-sync.js",
   "./firebase-config.js",
   "./manifest.webmanifest",
   "./icon.svg"
