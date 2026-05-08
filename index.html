@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f766e">
+    <title>Team Time Clock</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow" data-i18n="brand">Cambodia Team</p>
+          <h1 data-i18n="appTitle">Time Clock</h1>
+        </div>
+        <div class="top-actions">
+          <button class="language-toggle" id="languageToggle" type="button" aria-label="Switch language">ភាសាខ្មែរ</button>
+          <button class="ghost icon-button" id="logoutButton" title="Sign out" aria-label="Sign out" data-i18n="exit">Exit</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="screen active" id="loginScreen">
+          <div class="login-panel">
+            <h2 data-i18n="workerSignIn">Worker sign in</h2>
+            <p class="muted" data-i18n="pinHelp">Use your PIN to clock in and out.</p>
+            <form id="signInForm" class="form-stack">
+              <label for="pinInput" data-i18n="pin">PIN</label>
+              <input id="pinInput" type="password" inputmode="numeric" autocomplete="one-time-code" placeholder="Enter PIN" data-i18n-placeholder="enterPin">
+              <p class="error-message" id="pinError" role="alert"></p>
+              <button class="primary" id="loginButton" type="submit" data-i18n="signIn">Sign in</button>
+            </form>
+            <form id="createAccountForm" class="form-stack hidden">
+              <h2 data-i18n="createAccount">Create account</h2>
+              <label for="newWorkerName" data-i18n="name">Name</label>
+              <input id="newWorkerName" type="text" autocomplete="name" placeholder="Your name" data-i18n-placeholder="yourName">
+              <label for="newWorkerPin" data-i18n="createPin">Create PIN</label>
+              <input id="newWorkerPin" type="password" inputmode="numeric" autocomplete="new-password" placeholder="Choose a PIN" data-i18n-placeholder="choosePin">
+              <p class="error-message" id="createError" role="alert"></p>
+              <button class="primary" type="submit" data-i18n="createAccount">Create account</button>
+              <button class="link-button" data-auth-mode="signin" type="button" data-i18n="backToSignIn">Back to sign in</button>
+            </form>
+            <div class="login-links">
+              <button class="link-button" data-auth-mode="create" type="button" data-i18n="createAccount">Create account</button>
+              <a class="admin-link" href="admin.html" data-i18n="adminLogin">Admin login</a>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen" id="adminLoginScreen">
+          <div class="login-panel">
+            <h2 data-i18n="adminLogin">Admin login</h2>
+            <p class="muted" data-i18n="adminLoginHelp">Enter the admin passcode to view and approve hours.</p>
+            <form id="adminLoginForm" class="form-stack">
+              <label for="adminPasscode" data-i18n="passcode">Passcode</label>
+              <input id="adminPasscode" type="password" autocomplete="current-password" placeholder="Admin passcode" data-i18n-placeholder="adminPasscode">
+              <p class="error-message" id="adminError" role="alert"></p>
+              <button class="primary" type="submit" data-i18n="openAdmin">Open admin</button>
+            </form>
+            <a class="admin-link" href="/" data-i18n="workerLogin">Worker login</a>
+          </div>
+        </section>
+
+        <section class="screen" id="workerScreen">
+          <div class="worker-hero">
+            <p class="muted" data-i18n="hello">Hello</p>
+            <h2 id="workerName">Worker</h2>
+            <div class="status-pill" id="shiftStatus" data-i18n="notClockedIn">Not clocked in</div>
+            <button class="clock-button" id="clockButton" data-i18n="clockIn">Clock In</button>
+            <p class="sync-note" id="syncNote" data-i18n="readyOffline">Ready offline</p>
+          </div>
+
+          <nav class="tabs" data-nav-label="workerViews" aria-label="Worker views">
+            <button class="tab active" data-worker-tab="hours" data-i18n="hours">Hours</button>
+            <button class="tab" data-worker-tab="request" data-i18n="request">Request</button>
+          </nav>
+
+          <div class="tab-panel active" id="hoursTab">
+            <div class="summary-band">
+              <span data-i18n="thisWeek">This week</span>
+              <strong id="weekTotal">0h 00m</strong>
+            </div>
+            <div class="list" id="workerShiftList"></div>
+          </div>
+
+          <div class="tab-panel" id="requestTab">
+            <form id="requestForm" class="form-stack">
+              <label for="requestDate" data-i18n="date">Date</label>
+              <input id="requestDate" type="date" required>
+              <div class="time-grid">
+                <div>
+                  <label for="requestStart" data-i18n="clockInField">Clock in</label>
+                  <input id="requestStart" type="time">
+                </div>
+                <div>
+                  <label for="requestEnd" data-i18n="clockOutField">Clock out</label>
+                  <input id="requestEnd" type="time">
+                </div>
+              </div>
+              <label for="requestText" data-i18n="reason">Reason</label>
+              <textarea id="requestText" rows="3" placeholder="Example: I forgot to clock out at 5:00 PM." data-i18n-placeholder="requestExample"></textarea>
+              <button class="primary" type="submit" data-i18n="submitRequest">Submit Request</button>
+            </form>
+            <div class="list" id="workerRequestList"></div>
+          </div>
+        </section>
+
+        <section class="screen" id="adminScreen">
+          <div class="admin-head">
+            <div>
+              <p class="eyebrow" data-i18n="admin">Admin</p>
+              <h2 data-i18n="weeklyHours">Weekly Hours</h2>
+            </div>
+            <span class="status-pill" data-i18n="admin">Admin</span>
+          </div>
+
+          <nav class="tabs" data-nav-label="adminViews" aria-label="Admin views">
+            <button class="tab active" data-admin-tab="team" data-i18n="team">Team</button>
+            <button class="tab" data-admin-tab="requests" data-i18n="requests">Requests</button>
+          </nav>
+
+          <div class="tab-panel active" id="teamTab">
+            <div class="list" id="adminWorkerList"></div>
+          </div>
+
+          <div class="tab-panel" id="requestsTab">
+            <div class="list" id="adminRequestList"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
