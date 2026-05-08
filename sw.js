@@ -1,10 +1,11 @@
-const CACHE_NAME = "team-time-clock-v13";
+const CACHE_NAME = "team-time-clock-v14";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./admin.html",
   "./styles.css",
   "./app.js",
+  "./firebase-config.js",
   "./manifest.webmanifest",
   "./icon.svg"
 ];
