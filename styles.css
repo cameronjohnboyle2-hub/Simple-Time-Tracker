@@ -1,0 +1,432 @@
+:root {
+  color-scheme: light;
+  --bg: #f5f7f6;
+  --ink: #16211f;
+  --muted: #64706d;
+  --line: #dce4e1;
+  --panel: #ffffff;
+  --teal: #0f766e;
+  --teal-dark: #115e59;
+  --amber: #b7791f;
+  --red: #b42318;
+  --green-soft: #e7f7f2;
+  font-family: Arial, "Noto Sans Khmer", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.toast {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  z-index: 10;
+  width: min(420px, calc(100% - 28px));
+  transform: translateX(-50%);
+  border: 1px solid #f4c7c3;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #fff1f0;
+  color: var(--red);
+  font-weight: 800;
+  box-shadow: 0 8px 26px rgba(22, 33, 31, 0.16);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+.app-shell {
+  width: min(760px, 100%);
+  min-height: 100vh;
+  margin: 0 auto;
+  background: var(--panel);
+}
+
+.topbar,
+.admin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 18px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.language-toggle {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--teal-dark);
+  white-space: nowrap;
+}
+
+.eyebrow,
+.muted,
+.hint,
+.sync-note {
+  margin: 0;
+  color: var(--muted);
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0;
+  font-weight: 700;
+}
+
+h1,
+h2 {
+  margin: 4px 0 0;
+  line-height: 1.1;
+}
+
+.screen {
+  display: none;
+  padding: 18px;
+}
+
+.screen.active,
+.tab-panel.active {
+  display: block;
+}
+
+.login-panel {
+  display: grid;
+  gap: 12px;
+  padding-top: 20vh;
+}
+
+label {
+  font-weight: 700;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+  color: var(--ink);
+}
+
+textarea {
+  resize: vertical;
+}
+
+button {
+  min-height: 48px;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.primary {
+  background: var(--teal);
+  color: white;
+}
+
+.primary:active,
+.clock-button:active {
+  transform: translateY(1px);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--ink);
+}
+
+.icon-button {
+  min-width: 58px;
+  padding: 0 12px;
+  display: none;
+  border: 1px solid var(--line);
+}
+
+.icon-button.visible {
+  display: block;
+}
+
+.worker-hero {
+  display: grid;
+  gap: 14px;
+  padding: 18px 0 20px;
+}
+
+.status-pill {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: var(--green-soft);
+  color: var(--teal-dark);
+  font-weight: 800;
+}
+
+.clock-button {
+  width: 100%;
+  min-height: 132px;
+  border-radius: 8px;
+  background: var(--teal);
+  color: #fff;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.clock-button.out {
+  background: var(--amber);
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 6px;
+  margin: 8px 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfa;
+}
+
+.tab {
+  min-height: 42px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.tab.active {
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 1px 8px rgba(22, 33, 31, 0.08);
+}
+
+.tab-panel {
+  display: none;
+}
+
+.summary-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  background: #edf8f5;
+}
+
+.summary-band strong {
+  font-size: 26px;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+}
+
+.item {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.worker-details summary {
+  display: grid;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.worker-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.details-labels {
+  justify-content: flex-end;
+}
+
+.hide-label,
+.worker-details[open] .show-label {
+  display: none;
+}
+
+.worker-details[open] .hide-label {
+  display: inline;
+}
+
+.day-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.day-row {
+  display: grid;
+  grid-template-columns: minmax(82px, 1fr) minmax(0, 2fr) auto;
+  gap: 10px;
+  align-items: start;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.day-row strong {
+  color: var(--ink);
+}
+
+.delete-zone {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.delete-start,
+.delete-final {
+  background: #fff1f0;
+  color: var(--red);
+}
+
+.delete-confirm {
+  display: grid;
+  gap: 10px;
+}
+
+.delete-slider {
+  accent-color: var(--red);
+}
+
+.item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.small {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.error-message {
+  min-height: 20px;
+  margin: -4px 0 0;
+  color: var(--red);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.form-stack {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.hidden,
+.form-stack.hidden {
+  display: none;
+}
+
+.admin-link {
+  color: var(--teal-dark);
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+}
+
+.login-links {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.link-button {
+  min-height: auto;
+  padding: 0;
+  background: transparent;
+  color: var(--teal-dark);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.time-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.time-grid > div {
+  display: grid;
+  gap: 10px;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.approve {
+  background: var(--teal);
+  color: #fff;
+}
+
+.deny {
+  background: #fff1f0;
+  color: var(--red);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (max-width: 430px) {
+  .topbar,
+  .admin-head,
+  .screen {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .clock-button {
+    min-height: 118px;
+    font-size: 30px;
+  }
+
+  .time-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .day-row {
+    grid-template-columns: 1fr;
+  }
+}
