@@ -20,12 +20,22 @@
     const { FIREBASE_TEAM_ID, firebaseConfig, hasFirebaseConfig } = await import("./firebase-config.js");
     if (!hasFirebaseConfig(firebaseConfig)) return;
 
-    const [{ initializeApp }, firestore] = await Promise.all([
+    const [appModule, firestore] = await Promise.all([
       import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js"),
       import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js")
     ]);
+    const { getAuth, onAuthStateChanged, signInAnonymously } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js");
 
-    const app = initializeApp(firebaseConfig);
+    const app = appModule.getApps().length ? appModule.getApp() : appModule.initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    if (!auth.currentUser) {
+      try {
+        await signInAnonymously(auth);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
     const db = firestore.initializeFirestore(app, {
       localCache: firestore.persistentLocalCache({
         tabManager: firestore.persistentMultipleTabManager()
@@ -33,35 +43,41 @@
     });
     const stateRef = firestore.doc(db, "teams", FIREBASE_TEAM_ID, "state", "current");
 
-    saveRemoteState = async (json) => {
-      try {
-        await firestore.setDoc(stateRef, {
-          json,
-          updatedAt: new Date().toISOString()
-        });
-      } catch (error) {
+    const attachRemoteSync = () => {
+      saveRemoteState = async (json) => {
+        try {
+          await firestore.setDoc(stateRef, {
+            json,
+            updatedAt: new Date().toISOString()
+          });
+        } catch (error) {
+          console.error(error);
+        }
+      };
+
+      firestore.onSnapshot(stateRef, (snapshot) => {
+        remoteReady = true;
+        const remoteJson = snapshot.data()?.json || "";
+        const localJson = originalGetItem(STORAGE_KEY) || "";
+
+        if (!remoteJson && localJson) {
+          saveRemoteState(localJson);
+          return;
+        }
+
+        if (remoteJson && remoteJson !== localJson) {
+          remoteStateJson = remoteJson;
+          originalSetItem(STORAGE_KEY, remoteJson);
+          originalSetItem(REMOTE_SOURCE_KEY, new Date().toISOString());
+          window.location.reload();
+        }
+      }, (error) => {
         console.error(error);
-      }
+      });
     };
 
-    firestore.onSnapshot(stateRef, (snapshot) => {
-      remoteReady = true;
-      const remoteJson = snapshot.data()?.json || "";
-      const localJson = originalGetItem(STORAGE_KEY) || "";
-
-      if (!remoteJson && localJson) {
-        saveRemoteState(localJson);
-        return;
-      }
-
-      if (remoteJson && remoteJson !== localJson) {
-        remoteStateJson = remoteJson;
-        originalSetItem(STORAGE_KEY, remoteJson);
-        originalSetItem(REMOTE_SOURCE_KEY, new Date().toISOString());
-        window.location.reload();
-      }
-    }, (error) => {
-      console.error(error);
+    onAuthStateChanged(auth, (user) => {
+      if (user && !remoteReady) attachRemoteSync();
     });
   }
 
