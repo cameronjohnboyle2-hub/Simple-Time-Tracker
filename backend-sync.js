@@ -7,10 +7,13 @@
   let remoteReady = false;
   let remoteStateJson = "";
   let saveRemoteState = null;
+  let localDirty = false;
 
   localStorage.setItem = (key, value) => {
     originalSetItem(key, value);
-    if (key === STORAGE_KEY && remoteReady && saveRemoteState && value !== remoteStateJson) {
+    if (key !== STORAGE_KEY) return;
+    localDirty = value !== remoteStateJson;
+    if (remoteReady && saveRemoteState && localDirty) {
       window.clearTimeout(saveTimer);
       saveTimer = window.setTimeout(() => saveRemoteState(value), 250);
     }
@@ -35,7 +38,6 @@
         console.error(error);
       }
     }
-
     const db = firestore.initializeFirestore(app, {
       localCache: firestore.persistentLocalCache({
         tabManager: firestore.persistentMultipleTabManager()
@@ -60,7 +62,15 @@
         const remoteJson = snapshot.data()?.json || "";
         const localJson = originalGetItem(STORAGE_KEY) || "";
 
+        if (localDirty && localJson) {
+          remoteStateJson = localJson;
+          localDirty = false;
+          saveRemoteState(localJson);
+          return;
+        }
+
         if (!remoteJson && localJson) {
+          remoteStateJson = localJson;
           saveRemoteState(localJson);
           return;
         }
@@ -69,6 +79,7 @@
           remoteStateJson = remoteJson;
           originalSetItem(STORAGE_KEY, remoteJson);
           originalSetItem(REMOTE_SOURCE_KEY, new Date().toISOString());
+          localDirty = false;
           window.location.reload();
         }
       }, (error) => {
@@ -77,7 +88,9 @@
     };
 
     onAuthStateChanged(auth, (user) => {
-      if (user && !remoteReady) attachRemoteSync();
+      if (user && !remoteReady) {
+        attachRemoteSync();
+      }
     });
   }
 
