@@ -9,6 +9,42 @@
   let saveRemoteState = null;
   let localDirty = false;
 
+  function parseState(json) {
+    try {
+      return json ? JSON.parse(json) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function mergeById(localItems = [], remoteItems = []) {
+    const byId = new Map();
+    remoteItems.forEach((item) => byId.set(item.id, item));
+    localItems.forEach((item) => byId.set(item.id, { ...byId.get(item.id), ...item }));
+    return Array.from(byId.values());
+  }
+
+  function normalizeJson(json) {
+    const state = parseState(json);
+    return JSON.stringify({
+      workers: state.workers || [],
+      events: state.events || [],
+      requests: state.requests || [],
+      overrides: state.overrides || []
+    });
+  }
+
+  function mergeStateJson(localJson, remoteJson) {
+    const localState = parseState(localJson);
+    const remoteState = parseState(remoteJson);
+    return JSON.stringify({
+      workers: mergeById(localState.workers, remoteState.workers),
+      events: mergeById(localState.events, remoteState.events),
+      requests: mergeById(localState.requests, remoteState.requests),
+      overrides: mergeById(localState.overrides, remoteState.overrides)
+    });
+  }
+
   localStorage.setItem = (key, value) => {
     originalSetItem(key, value);
     if (key !== STORAGE_KEY) return;
@@ -76,8 +112,14 @@
         }
 
         if (remoteJson && remoteJson !== localJson) {
-          remoteStateJson = remoteJson;
-          originalSetItem(STORAGE_KEY, remoteJson);
+          const mergedJson = mergeStateJson(localJson, remoteJson);
+          remoteStateJson = mergedJson;
+          if (normalizeJson(remoteJson) !== mergedJson) {
+            saveRemoteState(mergedJson);
+          }
+          if (normalizeJson(localJson) !== mergedJson) {
+            originalSetItem(STORAGE_KEY, mergedJson);
+          }
           originalSetItem(REMOTE_SOURCE_KEY, new Date().toISOString());
           localDirty = false;
           window.location.reload();
