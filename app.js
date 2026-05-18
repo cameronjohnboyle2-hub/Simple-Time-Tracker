@@ -241,7 +241,7 @@ function normalizeState(saved) {
     workers,
     events: (saved.events || []).filter((event) => workerIds.has(event.workerId)),
     requests: (saved.requests || []).filter((request) => workerIds.has(request.workerId)),
-    overrides: (saved.overrides || []).filter((override) => workerIds.has(override.workerId))
+    overrides: dedupeOverrides((saved.overrides || []).filter((override) => workerIds.has(override.workerId)))
   };
 }
 
@@ -413,11 +413,36 @@ function rawShiftsForWorker(workerId) {
 }
 
 function shiftsForWorker(workerId) {
-  const approvedOverrides = state.overrides.filter((override) => override.workerId === workerId);
+  const approvedOverrides = dedupeOverrides(state.overrides.filter((override) => override.workerId === workerId));
   const overrideDates = new Set(approvedOverrides.map((override) => override.date));
   const rawShifts = rawShiftsForWorker(workerId).filter((shift) => !overrideDates.has(shift.date));
   const manualShifts = approvedOverrides.map((override) => ({ workerId, date: override.date, inAt: override.inAt, outAt: override.outAt, pending: false, manual: true, requestId: override.requestId }));
   return [...rawShifts, ...manualShifts].sort((a, b) => new Date(b.inAt) - new Date(a.inAt));
+}
+
+function overrideDateKey(override) {
+  return `${override.workerId}|${override.date}`;
+}
+
+function overrideId(workerId, date) {
+  return `override-${workerId}-${date}`;
+}
+
+function overrideSortTime(override) {
+  return new Date(override.approvedAt || override.reviewedAt || override.createdAt || 0).getTime();
+}
+
+function dedupeOverrides(overrides = []) {
+  const byDate = new Map();
+  overrides.forEach((override) => {
+    if (!override.workerId || !override.date || !override.inAt || !override.outAt) return;
+    const key = overrideDateKey(override);
+    const current = byDate.get(key);
+    if (!current || overrideSortTime(override) >= overrideSortTime(current)) {
+      byDate.set(key, { ...override, id: overrideId(override.workerId, override.date) });
+    }
+  });
+  return Array.from(byDate.values());
 }
 
 function weeklyShifts(workerId, weekOffset = 0) {
@@ -533,7 +558,7 @@ function renderDailyRows(workerId, weekOffset = 0) {
     const times = shifts.length ? shifts.map((shift) => `${formatTimeOnly(shift.inAt)} - ${shift.outAt ? formatTimeOnly(shift.outAt) : t("now")}`).join(", ") : t("noTime");
     const editShift = shifts.find((shift) => shift.outAt) || shifts[0];
     const hasManual = state.overrides.some((override) => override.workerId === workerId && override.date === date);
-    return `<div class="day-card"><div class="day-row"><strong>${shortDateLabel(date)}</strong><span>${times}</span><strong>${formatDuration(total)}</strong></div><div class="manual-edit"><span class="small">${t("manualEdit")}</span><input type="time" data-time-edit="start" data-worker-id="${workerId}" data-date="${date}" value="${editShift?.inAt ? timeInputValue(editShift.inAt) : ""}" aria-label="${t("clockInField")} ${shortDateLabel(date)}"><input type="time" data-time-edit="end" data-worker-id="${workerId}" data-date="${date}" value="${editShift?.outAt ? timeInputValue(editShift.outAt) : ""}" aria-label="${t("clockOutField")} ${shortDateLabel(date)}"><button class="approve compact-button" data-time-save="true" data-worker-id="${workerId}" data-date="${date}" type="button">${t("saveTimes")}</button><button class="deny compact-button" data-time-clear="true" data-worker-id="${workerId}" data-date="${date}" type="button" ${hasManual ? "" : "disabled"}>${t("clearManual")}</button></div></div>`;
+    return `<div class="day-card"><div class="day-row editable-day-row"><strong>${shortDateLabel(date)}</strong><div class="inline-time-edit"><input type="time" data-time-edit="start" data-worker-id="${workerId}" data-date="${date}" value="${editShift?.inAt ? timeInputValue(editShift.inAt) : ""}" aria-label="${t("clockInField")} ${shortDateLabel(date)}"><input type="time" data-time-edit="end" data-worker-id="${workerId}" data-date="${date}" value="${editShift?.outAt ? timeInputValue(editShift.outAt) : ""}" aria-label="${t("clockOutField")} ${shortDateLabel(date)}"></div><strong>${formatDuration(total)}</strong></div><div class="manual-edit"><span class="small">${times}</span><button class="approve compact-button" data-time-save="true" data-worker-id="${workerId}" data-date="${date}" type="button">${t("saveTimes")}</button><button class="deny compact-button" data-time-clear="true" data-worker-id="${workerId}" data-date="${date}" type="button" ${hasManual ? "" : "disabled"}>${t("clearManual")}</button></div></div>`;
   }).join("");
 }
 
@@ -578,8 +603,9 @@ function reviewRequest(requestId, status) {
   request.reviewedAt = new Date().toISOString();
   if (status === "approved") {
     state.overrides = state.overrides.filter((override) => override.workerId !== request.workerId || override.date !== request.date);
-    state.overrides.push({ id: crypto.randomUUID(), requestId: request.id, workerId: request.workerId, date: request.date, inAt: approvedShift.inAt, outAt: approvedShift.outAt, approvedAt: request.reviewedAt });
+    state.overrides.push({ id: overrideId(request.workerId, request.date), requestId: request.id, workerId: request.workerId, date: request.date, inAt: approvedShift.inAt, outAt: approvedShift.outAt, approvedAt: request.reviewedAt });
   }
+  state.overrides = dedupeOverrides(state.overrides);
   saveState();
   renderAdmin();
 }
@@ -629,7 +655,8 @@ function saveManualTimes(workerId, date) {
   const outAt = cambodiaDateTimeToIso(date, end);
   if (new Date(outAt) <= new Date(inAt)) return showFieldError(endInput, endInput, t("outAfterIn"));
   state.overrides = state.overrides.filter((override) => override.workerId !== workerId || override.date !== date);
-  state.overrides.push({ id: crypto.randomUUID(), requestId: `manual-${crypto.randomUUID()}`, workerId, date, inAt, outAt, approvedAt: new Date().toISOString(), manualEdit: true });
+  state.overrides.push({ id: overrideId(workerId, date), requestId: `manual-${workerId}-${date}`, workerId, date, inAt, outAt, approvedAt: new Date().toISOString(), manualEdit: true });
+  state.overrides = dedupeOverrides(state.overrides);
   saveState();
   showToast(t("manualSaved"));
   renderAdmin();

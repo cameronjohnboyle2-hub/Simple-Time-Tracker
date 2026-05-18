@@ -24,13 +24,38 @@
     return Array.from(byId.values());
   }
 
+  function overrideId(workerId, date) {
+    return `override-${workerId}-${date}`;
+  }
+
+  function overrideTime(override) {
+    return new Date(override.approvedAt || override.reviewedAt || override.createdAt || 0).getTime();
+  }
+
+  function mergeOverrides(localItems = [], remoteItems = []) {
+    const byDate = new Map();
+    [...remoteItems, ...localItems].forEach((override) => {
+      if (!override?.workerId || !override?.date || !override?.inAt || !override?.outAt) return;
+      const key = `${override.workerId}|${override.date}`;
+      const current = byDate.get(key);
+      if (!current || overrideTime(override) >= overrideTime(current)) {
+        byDate.set(key, {
+          ...current,
+          ...override,
+          id: overrideId(override.workerId, override.date)
+        });
+      }
+    });
+    return Array.from(byDate.values());
+  }
+
   function normalizeJson(json) {
     const state = parseState(json);
     return JSON.stringify({
       workers: state.workers || [],
       events: state.events || [],
       requests: state.requests || [],
-      overrides: state.overrides || []
+      overrides: mergeOverrides(state.overrides || [], [])
     });
   }
 
@@ -41,7 +66,7 @@
       workers: mergeById(localState.workers, remoteState.workers),
       events: mergeById(localState.events, remoteState.events),
       requests: mergeById(localState.requests, remoteState.requests),
-      overrides: mergeById(localState.overrides, remoteState.overrides)
+      overrides: mergeOverrides(localState.overrides, remoteState.overrides)
     });
   }
 

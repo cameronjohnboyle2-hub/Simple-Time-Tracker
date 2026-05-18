@@ -325,9 +325,20 @@ button {
   color: var(--ink);
 }
 
+.inline-time-edit {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.inline-time-edit input {
+  min-width: 0;
+  padding: 10px;
+}
+
 .manual-edit {
   display: grid;
-  grid-template-columns: minmax(82px, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
   align-items: center;
 }
@@ -477,6 +488,7 @@ button:disabled {
   }
 
   .week-nav,
+  .inline-time-edit,
   .manual-edit {
     grid-template-columns: 1fr;
     text-align: left;
