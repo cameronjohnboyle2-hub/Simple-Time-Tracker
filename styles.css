@@ -287,6 +287,31 @@ button {
   border-top: 1px solid var(--line);
 }
 
+.week-nav {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  text-align: center;
+  background: #f8fbfa;
+}
+
+.week-button {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  color: var(--teal-dark);
+}
+
+.day-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.day-card:last-child {
+  border-bottom: 0;
+}
+
 .day-row {
   display: grid;
   grid-template-columns: minmax(82px, 1fr) minmax(0, 2fr) auto;
@@ -298,6 +323,27 @@ button {
 
 .day-row strong {
   color: var(--ink);
+}
+
+.manual-edit {
+  display: grid;
+  grid-template-columns: minmax(82px, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.manual-edit .small {
+  font-weight: 800;
+}
+
+.manual-edit input {
+  min-width: 0;
+  padding: 10px;
+}
+
+.compact-button {
+  min-height: 40px;
+  padding: 0 10px;
 }
 
 .delete-zone {
@@ -428,5 +474,11 @@ button:disabled {
 
   .day-row {
     grid-template-columns: 1fr;
+  }
+
+  .week-nav,
+  .manual-edit {
+    grid-template-columns: 1fr;
+    text-align: left;
   }
 }

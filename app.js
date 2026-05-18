@@ -87,7 +87,16 @@ const translations = {
     adminViews: "Admin views",
     confirmDeleteLabel: "Confirm delete {name}",
     clockInSummary: "Clock in {time}",
-    clockOutSummary: "Clock out {time}"
+    clockOutSummary: "Clock out {time}",
+    previousWeek: "Previous week",
+    nextWeek: "Next week",
+    currentWeek: "Current week",
+    weekOf: "Week of {range}",
+    manualEdit: "Manual edit",
+    saveTimes: "Save times",
+    clearManual: "Clear manual edit",
+    manualNeedsBoth: "Choose both clock-in and clock-out times to save an admin edit",
+    manualSaved: "Manual time edit saved"
   },
   km: {
     brand: "ក្រុមការងារកម្ពុជា",
@@ -172,7 +181,16 @@ const translations = {
     adminViews: "ផ្នែកគ្រប់គ្រង",
     confirmDeleteLabel: "បញ្ជាក់លុប {name}",
     clockInSummary: "ម៉ោងចូល {time}",
-    clockOutSummary: "ម៉ោងចេញ {time}"
+    clockOutSummary: "ម៉ោងចេញ {time}",
+    previousWeek: "សប្ដាហ៍មុន",
+    nextWeek: "សប្ដាហ៍បន្ទាប់",
+    currentWeek: "សប្ដាហ៍នេះ",
+    weekOf: "សប្ដាហ៍ចាប់ពី {range}",
+    manualEdit: "កែម៉ោងដោយដៃ",
+    saveTimes: "រក្សាទុកម៉ោង",
+    clearManual: "លុបការកែដោយដៃ",
+    manualNeedsBoth: "សូមជ្រើសម៉ោងចូល និងម៉ោងចេញ ដើម្បីរក្សាទុកការកែដោយអ្នកគ្រប់គ្រង",
+    manualSaved: "បានរក្សាទុកការកែម៉ោងដោយដៃ"
   }
 };
 
@@ -212,6 +230,7 @@ const els = {
 
 let language = localStorage.getItem(LANGUAGE_KEY) || "en";
 let session = { role: "guest", workerId: null };
+let adminWeekOffset = 0;
 let state = normalizeState(JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"));
 saveState();
 
@@ -356,12 +375,22 @@ function weekStartCambodia(now = new Date()) {
   return utcDate;
 }
 
+function weekStartForOffset(weekOffset = 0) {
+  const start = weekStartCambodia();
+  start.setUTCDate(start.getUTCDate() + weekOffset * 7);
+  return start;
+}
+
 function dateKeyFromUtcDate(date) {
   return [date.getUTCFullYear(), String(date.getUTCMonth() + 1).padStart(2, "0"), String(date.getUTCDate()).padStart(2, "0")].join("-");
 }
 
 function currentWeekDateKeys() {
-  const start = weekStartCambodia();
+  return weekDateKeys(0);
+}
+
+function weekDateKeys(weekOffset = 0) {
+  const start = weekStartForOffset(weekOffset);
   return Array.from({ length: 7 }, (_, index) => {
     const date = new Date(start);
     date.setUTCDate(start.getUTCDate() + index);
@@ -391,8 +420,8 @@ function shiftsForWorker(workerId) {
   return [...rawShifts, ...manualShifts].sort((a, b) => new Date(b.inAt) - new Date(a.inAt));
 }
 
-function weeklyShifts(workerId) {
-  const dates = new Set(currentWeekDateKeys());
+function weeklyShifts(workerId, weekOffset = 0) {
+  const dates = new Set(weekDateKeys(weekOffset));
   return shiftsForWorker(workerId).filter((shift) => dates.has(shift.date || cambodiaDateKey(shift.inAt)));
 }
 
@@ -415,6 +444,15 @@ function formatTimeOnly(value) {
 
 function shortDateLabel(dateKey) {
   return new Intl.DateTimeFormat(language === "km" ? "km-KH" : "en-US", { timeZone: PHNOM_PENH_TZ, weekday: "short", month: "short", day: "numeric" }).format(new Date(`${dateKey}T00:00:00+07:00`));
+}
+
+function weekRangeLabel(weekOffset = 0) {
+  const dates = weekDateKeys(weekOffset);
+  return `${shortDateLabel(dates[0])} - ${shortDateLabel(dates[6])}`;
+}
+
+function timeInputValue(value) {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: PHNOM_PENH_TZ, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(value));
 }
 
 function renderWorker() {
@@ -465,29 +503,37 @@ function renderWorkerRequest(request) {
 }
 
 function renderAdmin() {
+  const weekControls = renderWeekControls();
   if (!state.workers.length) {
-    els.adminWorkerList.innerHTML = `<div class="item small">${t("noWorkers")}</div>`;
+    els.adminWorkerList.innerHTML = `${weekControls}<div class="item small">${t("noWorkers")}</div>`;
     els.adminRequestList.innerHTML = `<div class="item small">${t("noPending")}</div>`;
     return;
   }
-  els.adminWorkerList.innerHTML = state.workers.map(renderAdminWorker).join("");
+  els.adminWorkerList.innerHTML = `${weekControls}${state.workers.map(renderAdminWorker).join("")}`;
   const pending = state.requests.filter((request) => request.status === "pending");
   els.adminRequestList.innerHTML = pending.length ? pending.map(renderAdminRequest).join("") : `<div class="item small">${t("noPending")}</div>`;
 }
 
-function renderAdminWorker(worker) {
-  const shifts = weeklyShifts(worker.id);
-  const total = shifts.reduce((sum, shift) => sum + durationMs(shift), 0);
-  const open = currentOpenShift(worker.id);
-  return `<details class="item worker-details"><summary><div class="item-row"><strong>${escapeHtml(worker.name)}</strong><span class="status-pill">${open ? t("working") : t("out")}</span></div><div class="item-row"><span class="small">${t("thisWeek")}</span><strong>${formatDuration(total)}</strong></div><div class="item-row details-labels"><span class="small show-label">${t("showDays")}</span><span class="small hide-label">${t("hideDays")}</span></div></summary><div class="day-list">${renderDailyRows(worker.id)}</div><div class="delete-zone"><button class="delete-start" data-delete-start="${worker.id}" type="button">${t("deleteWorker")}</button><div class="delete-confirm hidden" data-delete-confirm="${worker.id}"><p class="small">${t("deleteConfirm", { name: escapeHtml(worker.name) })}</p><input class="delete-slider" data-delete-slider="${worker.id}" type="range" min="0" max="100" value="0" aria-label="${t("confirmDeleteLabel", { name: escapeHtml(worker.name) })}"><div class="actions"><button class="deny" data-delete-cancel="${worker.id}" type="button">${t("cancel")}</button><button class="delete-final" data-delete-final="${worker.id}" type="button" disabled>${t("delete")}</button></div></div></div></details>`;
+function renderWeekControls() {
+  return `<div class="item week-nav"><button class="ghost week-button" data-week-nav="-1" type="button">${t("previousWeek")}</button><div><strong>${adminWeekOffset === 0 ? t("currentWeek") : t("weekOf", { range: weekRangeLabel(adminWeekOffset) })}</strong><div class="small">${weekRangeLabel(adminWeekOffset)}</div></div><button class="ghost week-button" data-week-nav="1" type="button" ${adminWeekOffset === 0 ? "disabled" : ""}>${t("nextWeek")}</button></div>`;
 }
 
-function renderDailyRows(workerId) {
-  return currentWeekDateKeys().map((date) => {
-    const shifts = weeklyShifts(workerId).filter((shift) => shift.date === date);
+function renderAdminWorker(worker) {
+  const shifts = weeklyShifts(worker.id, adminWeekOffset);
+  const total = shifts.reduce((sum, shift) => sum + durationMs(shift), 0);
+  const open = currentOpenShift(worker.id);
+  const weekLabel = adminWeekOffset === 0 ? t("thisWeek") : t("weekOf", { range: weekRangeLabel(adminWeekOffset) });
+  return `<details class="item worker-details"><summary><div class="item-row"><strong>${escapeHtml(worker.name)}</strong><span class="status-pill">${open ? t("working") : t("out")}</span></div><div class="item-row"><span class="small">${weekLabel}</span><strong>${formatDuration(total)}</strong></div><div class="item-row details-labels"><span class="small show-label">${t("showDays")}</span><span class="small hide-label">${t("hideDays")}</span></div></summary><div class="day-list">${renderDailyRows(worker.id, adminWeekOffset)}</div><div class="delete-zone"><button class="delete-start" data-delete-start="${worker.id}" type="button">${t("deleteWorker")}</button><div class="delete-confirm hidden" data-delete-confirm="${worker.id}"><p class="small">${t("deleteConfirm", { name: escapeHtml(worker.name) })}</p><input class="delete-slider" data-delete-slider="${worker.id}" type="range" min="0" max="100" value="0" aria-label="${t("confirmDeleteLabel", { name: escapeHtml(worker.name) })}"><div class="actions"><button class="deny" data-delete-cancel="${worker.id}" type="button">${t("cancel")}</button><button class="delete-final" data-delete-final="${worker.id}" type="button" disabled>${t("delete")}</button></div></div></div></details>`;
+}
+
+function renderDailyRows(workerId, weekOffset = 0) {
+  return weekDateKeys(weekOffset).map((date) => {
+    const shifts = weeklyShifts(workerId, weekOffset).filter((shift) => shift.date === date);
     const total = shifts.reduce((sum, shift) => sum + durationMs(shift), 0);
     const times = shifts.length ? shifts.map((shift) => `${formatTimeOnly(shift.inAt)} - ${shift.outAt ? formatTimeOnly(shift.outAt) : t("now")}`).join(", ") : t("noTime");
-    return `<div class="day-row"><strong>${shortDateLabel(date)}</strong><span>${times}</span><strong>${formatDuration(total)}</strong></div>`;
+    const editShift = shifts.find((shift) => shift.outAt) || shifts[0];
+    const hasManual = state.overrides.some((override) => override.workerId === workerId && override.date === date);
+    return `<div class="day-card"><div class="day-row"><strong>${shortDateLabel(date)}</strong><span>${times}</span><strong>${formatDuration(total)}</strong></div><div class="manual-edit"><span class="small">${t("manualEdit")}</span><input type="time" data-time-edit="start" data-worker-id="${workerId}" data-date="${date}" value="${editShift?.inAt ? timeInputValue(editShift.inAt) : ""}" aria-label="${t("clockInField")} ${shortDateLabel(date)}"><input type="time" data-time-edit="end" data-worker-id="${workerId}" data-date="${date}" value="${editShift?.outAt ? timeInputValue(editShift.outAt) : ""}" aria-label="${t("clockOutField")} ${shortDateLabel(date)}"><button class="approve compact-button" data-time-save="true" data-worker-id="${workerId}" data-date="${date}" type="button">${t("saveTimes")}</button><button class="deny compact-button" data-time-clear="true" data-worker-id="${workerId}" data-date="${date}" type="button" ${hasManual ? "" : "disabled"}>${t("clearManual")}</button></div></div>`;
   }).join("");
 }
 
@@ -501,6 +547,17 @@ function renderAdminRequest(request) {
 }
 
 function handleAdminClick(event) {
+  const weekButton = event.target.closest("[data-week-nav]");
+  if (weekButton) {
+    adminWeekOffset += Number(weekButton.dataset.weekNav);
+    if (adminWeekOffset > 0) adminWeekOffset = 0;
+    renderAdmin();
+    return;
+  }
+  const saveTime = event.target.closest("[data-time-save]");
+  if (saveTime) return saveManualTimes(saveTime.dataset.workerId, saveTime.dataset.date);
+  const clearTime = event.target.closest("[data-time-clear]");
+  if (clearTime) return clearManualTimes(clearTime.dataset.workerId, clearTime.dataset.date);
   const deleteStart = event.target.closest("[data-delete-start]");
   if (deleteStart) return showDeleteConfirm(deleteStart.dataset.deleteStart);
   const deleteCancel = event.target.closest("[data-delete-cancel]");
@@ -553,6 +610,33 @@ function deleteWorker(workerId) {
   state.events = state.events.filter((event) => event.workerId !== workerId);
   state.requests = state.requests.filter((request) => request.workerId !== workerId);
   state.overrides = state.overrides.filter((override) => override.workerId !== workerId);
+  saveState();
+  renderAdmin();
+}
+
+function saveManualTimes(workerId, date) {
+  const startInput = document.querySelector(`[data-time-edit="start"][data-worker-id="${workerId}"][data-date="${date}"]`);
+  const endInput = document.querySelector(`[data-time-edit="end"][data-worker-id="${workerId}"][data-date="${date}"]`);
+  if (!startInput || !endInput) return;
+  const start = startInput.value;
+  const end = endInput.value;
+  if (!start || !end) {
+    const message = t("manualNeedsBoth");
+    showToast(message);
+    return showFieldError(start ? endInput : startInput, start ? endInput : startInput, message);
+  }
+  const inAt = cambodiaDateTimeToIso(date, start);
+  const outAt = cambodiaDateTimeToIso(date, end);
+  if (new Date(outAt) <= new Date(inAt)) return showFieldError(endInput, endInput, t("outAfterIn"));
+  state.overrides = state.overrides.filter((override) => override.workerId !== workerId || override.date !== date);
+  state.overrides.push({ id: crypto.randomUUID(), requestId: `manual-${crypto.randomUUID()}`, workerId, date, inAt, outAt, approvedAt: new Date().toISOString(), manualEdit: true });
+  saveState();
+  showToast(t("manualSaved"));
+  renderAdmin();
+}
+
+function clearManualTimes(workerId, date) {
+  state.overrides = state.overrides.filter((override) => override.workerId !== workerId || override.date !== date);
   saveState();
   renderAdmin();
 }
