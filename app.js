@@ -718,6 +718,16 @@ function toggleLanguage() {
   applyTranslations();
 }
 
+function applyRemoteState(json) {
+  try {
+    state = normalizeState(JSON.parse(json || "{}"));
+  } catch {
+    return;
+  }
+  if (session.role === "worker") renderWorker();
+  if (session.role === "admin") renderAdmin();
+}
+
 function escapeHtml(value) {
   return String(value || "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
 }
@@ -743,6 +753,8 @@ document.querySelectorAll("[data-admin-tab]").forEach((tab) => tab.addEventListe
 document.querySelectorAll("[data-auth-mode]").forEach((tab) => tab.addEventListener("click", () => setAuthMode(tab.dataset.authMode)));
 window.addEventListener("online", () => { state.events.forEach((event) => { event.pending = false; }); saveState(); if (session.role === "worker") renderWorker(); });
 window.addEventListener("offline", () => { if (session.role === "worker") renderWorker(); });
+window.addEventListener("team-time-clock-state-updated", (event) => applyRemoteState(event.detail?.json));
+window.__teamTimeClockApplyRemoteState = applyRemoteState;
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
 showScreen(isAdminRoute() ? "adminLoginScreen" : "loginScreen");
 applyTranslations();

@@ -70,6 +70,14 @@
     });
   }
 
+  function notifyStateUpdated(json) {
+    if (typeof window.__teamTimeClockApplyRemoteState === "function") {
+      window.__teamTimeClockApplyRemoteState(json);
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("team-time-clock-state-updated", { detail: { json } }));
+  }
+
   localStorage.setItem = (key, value) => {
     originalSetItem(key, value);
     if (key !== STORAGE_KEY) return;
@@ -147,7 +155,7 @@
           }
           originalSetItem(REMOTE_SOURCE_KEY, new Date().toISOString());
           localDirty = false;
-          window.location.reload();
+          notifyStateUpdated(mergedJson);
         }
       }, (error) => {
         console.error(error);
