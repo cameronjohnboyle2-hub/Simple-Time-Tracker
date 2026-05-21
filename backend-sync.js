@@ -107,11 +107,7 @@
         console.error(error);
       }
     }
-    const db = firestore.initializeFirestore(app, {
-      localCache: firestore.persistentLocalCache({
-        tabManager: firestore.persistentMultipleTabManager()
-      })
-    });
+    const db = firestore.getFirestore(app);
     const stateRef = firestore.doc(db, "teams", FIREBASE_TEAM_ID, "state", "current");
 
     const attachRemoteSync = () => {

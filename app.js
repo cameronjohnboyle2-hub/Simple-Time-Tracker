@@ -31,9 +31,9 @@ const translations = {
     clockedInSince: "Clocked in since {time}",
     clockIn: "Clock In",
     clockOut: "Clock Out",
-    onlineSync: "Online. Changes save here and are ready to sync.",
-    offlineSync: "Offline. Changes are saved on this phone.",
-    readyOffline: "Ready offline",
+    onlineSync: "Online. Changes save to the shared tracker.",
+    offlineSync: "Offline. Connect to the internet before changing hours.",
+    readyOffline: "Online only",
     hours: "Hours",
     request: "Request",
     thisWeek: "This week",
@@ -125,9 +125,9 @@ const translations = {
     clockedInSince: "បានចូលតាំងពី {time}",
     clockIn: "ចូលធ្វើការ",
     clockOut: "ចេញធ្វើការ",
-    onlineSync: "មានអ៊ីនធឺណិត។ ការផ្លាស់ប្តូរត្រូវបានរក្សាទុក។",
-    offlineSync: "គ្មានអ៊ីនធឺណិត។ រក្សាទុកលើទូរសព្ទនេះ។",
-    readyOffline: "អាចប្រើក្រៅអ៊ីនធឺណិត",
+    onlineSync: "មានអ៊ីនធឺណិត។ ការផ្លាស់ប្តូររក្សាទុកទៅកម្មវិធីរួម។",
+    offlineSync: "គ្មានអ៊ីនធឺណិត។ សូមភ្ជាប់អ៊ីនធឺណិត មុនពេលកែម៉ោង។",
+    readyOffline: "ប្រើតែពេលមានអ៊ីនធឺណិត",
     hours: "ម៉ោង",
     request: "សំណើ",
     thisWeek: "សប្តាហ៍នេះ",
@@ -288,6 +288,7 @@ function login(event) {
 
 function createAccount(event) {
   event.preventDefault();
+  if (!requireOnline()) return;
   els.createError.textContent = "";
   const name = els.newWorkerName.value.trim();
   const pin = els.newWorkerPin.value.trim();
@@ -351,8 +352,9 @@ function currentOpenShift(workerId) {
 }
 
 function clockToggle() {
+  if (!requireOnline()) return;
   const open = currentOpenShift(session.workerId);
-  state.events.push({ id: crypto.randomUUID(), workerId: session.workerId, type: open ? "out" : "in", at: new Date().toISOString(), pending: !navigator.onLine });
+  state.events.push({ id: crypto.randomUUID(), workerId: session.workerId, type: open ? "out" : "in", at: new Date().toISOString(), pending: false });
   saveState();
   renderWorker();
 }
@@ -506,6 +508,7 @@ function renderShiftItem(shift) {
 
 function submitRequest(event) {
   event.preventDefault();
+  if (!requireOnline()) return;
   const hasStart = Boolean(els.requestStart.value);
   const hasEnd = Boolean(els.requestEnd.value);
   const reason = els.requestText.value.trim();
@@ -595,6 +598,7 @@ function handleAdminClick(event) {
 }
 
 function reviewRequest(requestId, status) {
+  if (!requireOnline()) return;
   const request = state.requests.find((item) => item.id === requestId);
   if (!request) return;
   const approvedShift = buildApprovedShift(request);
@@ -632,6 +636,7 @@ function hideDeleteConfirm(workerId) {
 }
 
 function deleteWorker(workerId) {
+  if (!requireOnline()) return;
   state.workers = state.workers.filter((worker) => worker.id !== workerId);
   state.events = state.events.filter((event) => event.workerId !== workerId);
   state.requests = state.requests.filter((request) => request.workerId !== workerId);
@@ -641,6 +646,7 @@ function deleteWorker(workerId) {
 }
 
 function saveManualTimes(workerId, date) {
+  if (!requireOnline()) return;
   const startInput = document.querySelector(`[data-time-edit="start"][data-worker-id="${workerId}"][data-date="${date}"]`);
   const endInput = document.querySelector(`[data-time-edit="end"][data-worker-id="${workerId}"][data-date="${date}"]`);
   if (!startInput || !endInput) return;
@@ -663,6 +669,7 @@ function saveManualTimes(workerId, date) {
 }
 
 function clearManualTimes(workerId, date) {
+  if (!requireOnline()) return;
   state.overrides = state.overrides.filter((override) => override.workerId !== workerId || override.date !== date);
   saveState();
   renderAdmin();
@@ -718,6 +725,12 @@ function toggleLanguage() {
   applyTranslations();
 }
 
+function requireOnline() {
+  if (navigator.onLine) return true;
+  showToast(t("offlineSync"));
+  return false;
+}
+
 function applyRemoteState(json) {
   try {
     state = normalizeState(JSON.parse(json || "{}"));
@@ -755,6 +768,13 @@ window.addEventListener("online", () => { state.events.forEach((event) => { even
 window.addEventListener("offline", () => { if (session.role === "worker") renderWorker(); });
 window.addEventListener("team-time-clock-state-updated", (event) => applyRemoteState(event.detail?.json));
 window.__teamTimeClockApplyRemoteState = applyRemoteState;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => registration.unregister());
+  });
+}
+if ("caches" in window) {
+  caches.keys().then((keys) => keys.forEach((key) => caches.delete(key)));
+}
 showScreen(isAdminRoute() ? "adminLoginScreen" : "loginScreen");
 applyTranslations();
