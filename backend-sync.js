@@ -132,9 +132,14 @@
         const localJson = originalGetItem(STORAGE_KEY) || "";
 
         if (localDirty && localJson) {
-          remoteStateJson = localJson;
+          const mergedJson = remoteJson ? mergeStateJson(localJson, remoteJson) : normalizeJson(localJson);
+          remoteStateJson = mergedJson;
           localDirty = false;
-          saveRemoteState(localJson);
+          saveRemoteState(mergedJson);
+          if (normalizeJson(localJson) !== mergedJson) {
+            originalSetItem(STORAGE_KEY, mergedJson);
+            notifyStateUpdated(mergedJson);
+          }
           return;
         }
 
