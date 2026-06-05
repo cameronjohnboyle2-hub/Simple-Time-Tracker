@@ -1,8 +1,26 @@
+import {
+  PHNOM_PENH_TZ,
+  buildManualIntervals,
+  buildRawShifts,
+  cambodiaDateKey,
+  cambodiaDateTimeToIso,
+  dateInputValue,
+  getCambodiaDateParts,
+  intervalDurationMs,
+  isCrossDayInterval,
+  isLongInterval,
+  minuteIso,
+  normalizeOverride,
+  overrideIntervals,
+  shiftsWithOverrides,
+  timeInputValue
+} from "./time-logic.mjs";
+
 const STORAGE_KEY = "team-time-clock-v1";
 const LANGUAGE_KEY = "team-time-clock-language";
-const PHNOM_PENH_TZ = "Asia/Phnom_Penh";
 const ADMIN_PASSCODE_HASH = "ab798d4c1bb849f872f170f871945d50160df91b5e4e4e9ee2cce31074d0731f";
 
+const DEMO_WORKER_IDS = new Set(["w1", "w2", "w3", "w4", "w5", "w6", "w7", "w8"]);
 const translations = {
   en: {
     brand: "Cambodia Team",
@@ -95,34 +113,43 @@ const translations = {
     manualEdit: "Manual edit",
     saveTimes: "Save times",
     clearManual: "Clear manual edit",
-    manualNeedsBoth: "Choose both clock-in and clock-out times to save an admin edit",
-    manualSaved: "Manual time edit saved"
+    manualNeedsBoth: "Complete the start and end date/time for each interval before saving",
+    manualSaved: "Manual intervals saved",
+    manualIntervals: "Manual intervals",
+    addInterval: "Add interval",
+    removeInterval: "Remove",
+    startDate: "Start date",
+    endDate: "End date",
+    intervalOverlap: "Intervals cannot overlap",
+    reviewInterval: "Review",
+    reviewIntervalHelp: "Long or cross-day interval - verify the dates"
   },
   km: {
     brand: "ក្រុមការងារកម្ពុជា",
     appTitle: "កម្មវិធីកត់ម៉ោងធ្វើការ",
     exit: "ចេញ",
     workerSignIn: "ចូលគណនីបុគ្គលិក",
-    pinHelp: "ប្រើលេខ PIN របស់អ្នក ដើម្បីចូល និងចេញធ្វើការ។",
+    pinHelp: "ប្រើលេខ PIN របស់អ្នក ដើម្បីចូលធ្វើការ និងចេញធ្វើការ។",
     pin: "លេខ PIN",
     enterPin: "បញ្ចូលលេខ PIN",
-    signIn: "ចូល",
+    signIn: "ចូលគណនី",
     createAccount: "បង្កើតគណនី",
     name: "ឈ្មោះ",
     yourName: "ឈ្មោះរបស់អ្នក",
-    createPin: "បង្កើត PIN",
-    choosePin: "ជ្រើស PIN",
-    backToSignIn: "ត្រឡប់ទៅចូល",
-    adminLogin: "ចូលអ្នកគ្រប់គ្រង",
+    createPin: "បង្កើតលេខ PIN",
+    choosePin: "ជ្រើសលេខ PIN",
+    backToSignIn: "ត្រឡប់ទៅចូលគណនី",
+    adminLogin: "ចូលគណនីអ្នកគ្រប់គ្រង",
     admin: "អ្នកគ្រប់គ្រង",
-    adminLoginHelp: "បញ្ចូលលេខសម្ងាត់អ្នកគ្រប់គ្រង ដើម្បីមើល និងអនុម័តម៉ោង។",
-    passcode: "លេខសម្ងាត់",
-    adminPasscode: "លេខសម្ងាត់អ្នកគ្រប់គ្រង",
-    openAdmin: "បើកផ្នែកគ្រប់គ្រង",
-    workerLogin: "ចូលបុគ្គលិក",
+    adminLoginHelp: "ប្រើអ៊ីមែល និងពាក្យសម្ងាត់អ្នកគ្រប់គ្រង ដើម្បីមើល និងអនុម័តម៉ោង។",
+    adminEmail: "អ៊ីមែលអ្នកគ្រប់គ្រង",
+    adminPassword: "ពាក្យសម្ងាត់អ្នកគ្រប់គ្រង",
+    enterAdminCredentials: "បញ្ចូលអ៊ីមែល និងពាក្យសម្ងាត់អ្នកគ្រប់គ្រង",
+    openAdmin: "បើកផ្នែកអ្នកគ្រប់គ្រង",
+    workerLogin: "ចូលគណនីបុគ្គលិក",
     hello: "សួស្តី",
     notClockedIn: "មិនទាន់ចូលធ្វើការ",
-    clockedInSince: "បានចូលតាំងពី {time}",
+    clockedInSince: "បានចូលធ្វើការតាំងពី {time}",
     clockIn: "ចូលធ្វើការ",
     clockOut: "ចេញធ្វើការ",
     onlineSync: "មានអ៊ីនធឺណិត។ ការផ្លាស់ប្តូររក្សាទុកទៅកម្មវិធីរួម។",
@@ -131,45 +158,45 @@ const translations = {
     hours: "ម៉ោង",
     request: "សំណើ",
     thisWeek: "សប្តាហ៍នេះ",
-    noShifts: "មិនមានវេនសប្តាហ៍នេះទេ។",
+    noShifts: "មិនមានវេនការងារដែលបានកត់ត្រាក្នុងសប្តាហ៍នេះទេ។",
     date: "កាលបរិច្ឆេទ",
     clockInField: "ម៉ោងចូល",
     clockOutField: "ម៉ោងចេញ",
     reason: "មូលហេតុ",
-    requestExample: "ឧទាហរណ៍៖ ខ្ញុំភ្លេចចេញម៉ោង 5:00 ល្ងាច។",
+    requestExample: "ឧទាហរណ៍៖ ខ្ញុំភ្លេចចេញធ្វើការនៅម៉ោង 5:00 ល្ងាច។",
     submitRequest: "ដាក់សំណើ",
-    noRequests: "មិនទាន់មានសំណើ។",
-    weeklyHours: "ម៉ោងប្រចាំសប្តាហ៍",
+    noRequests: "មិនទាន់មានសំណើទេ។",
+    weeklyHours: "ម៉ោងធ្វើការប្រចាំសប្តាហ៍",
     team: "ក្រុម",
     requests: "សំណើ",
-    noWorkers: "មិនទាន់មានបុគ្គលិក។",
-    noPending: "មិនមានសំណើកំពុងរង់ចាំ។",
+    noWorkers: "មិនទាន់មានគណនីបុគ្គលិកទេ។",
+    noPending: "មិនមានសំណើកំពុងរង់ចាំទេ។",
     working: "កំពុងធ្វើការ",
-    out: "ចេញ",
+    out: "បានចេញ",
     showDays: "បង្ហាញថ្ងៃ",
     hideDays: "លាក់ថ្ងៃ",
-    noTime: "គ្មានម៉ោង",
+    noTime: "មិនមានម៉ោង",
     deleteWorker: "លុបបុគ្គលិក",
-    deleteConfirm: "អូសទៅស្តាំដើម្បីបញ្ជាក់លុប {name}។",
+    deleteConfirm: "អូសទៅស្តាំឱ្យដល់ចុង ដើម្បីបញ្ជាក់ការលុប {name}។",
     cancel: "បោះបង់",
     delete: "លុប",
-    incorrectPin: "PIN មិនត្រឹមត្រូវ សូមព្យាយាមម្តងទៀត",
-    incorrectAdmin: "លេខសម្ងាត់មិនត្រឹមត្រូវ សូមព្យាយាមម្តងទៀត",
+    incorrectPin: "លេខ PIN មិនត្រឹមត្រូវ សូមព្យាយាមម្តងទៀត",
+    incorrectAdmin: "លេខសម្ងាត់អ្នកគ្រប់គ្រងមិនត្រឹមត្រូវ សូមព្យាយាមម្តងទៀត",
     enterName: "បញ្ចូលឈ្មោះរបស់អ្នក",
     fourNumbers: "ប្រើលេខយ៉ាងតិច 4 ខ្ទង់",
     pinTaken: "លេខ PIN នេះមានអ្នកប្រើហើយ សូមជ្រើសលេខផ្សេង",
     addTimeOrNote: "បញ្ចូលម៉ោង ឬកំណត់ចំណាំ",
-    outAfterIn: "ម៉ោងចេញត្រូវក្រោយម៉ោងចូល",
-    pending: "រង់ចាំ",
-    approved: "អនុម័ត",
-    denied: "បដិសេធ",
+    outAfterIn: "ម៉ោងចេញត្រូវតែក្រោយម៉ោងចូល",
+    pending: "កំពុងរង់ចាំ",
+    approved: "បានអនុម័ត",
+    denied: "បានបដិសេធ",
     approveAction: "អនុម័ត",
     denyAction: "បដិសេធ",
-    noClockTime: "មិនបានជ្រើសម៉ោង",
-    needsShift: "ត្រូវមានវេន ឬបញ្ចូលទាំងម៉ោងចូលនិងចេញ។",
+    noClockTime: "មិនទាន់បានជ្រើសម៉ោងទេ",
+    needsShift: "ត្រូវមានវេនការងារដែលមានស្រាប់ ឬបញ្ចូលទាំងម៉ោងចូល និងម៉ោងចេញ មុនពេលអនុម័តការកែម៉ោង។",
     willBecome: "នឹងក្លាយជា {time}",
-    adminApproved: "អនុម័តដោយអ្នកគ្រប់គ្រង",
-    pendingSync: "រង់ចាំសមកាលកម្ម",
+    adminApproved: "បានអនុម័តដោយអ្នកគ្រប់គ្រង",
+    pendingSync: "រង់ចាំធ្វើសមកាលកម្ម",
     saved: "បានរក្សាទុក",
     inProgress: "កំពុងធ្វើការ",
     now: "ឥឡូវនេះ",
@@ -178,8 +205,8 @@ const translations = {
     switchLanguage: "ប្តូរភាសា",
     signOutLabel: "ចេញពីគណនី",
     workerViews: "ផ្នែកបុគ្គលិក",
-    adminViews: "ផ្នែកគ្រប់គ្រង",
-    confirmDeleteLabel: "បញ្ជាក់លុប {name}",
+    adminViews: "ផ្នែកអ្នកគ្រប់គ្រង",
+    confirmDeleteLabel: "បញ្ជាក់ការលុប {name}",
     clockInSummary: "ម៉ោងចូល {time}",
     clockOutSummary: "ម៉ោងចេញ {time}",
     previousWeek: "សប្ដាហ៍មុន",
@@ -211,6 +238,7 @@ const els = {
   pinError: document.querySelector("#pinError"),
   adminError: document.querySelector("#adminError"),
   pinInput: document.querySelector("#pinInput"),
+  loginButton: document.querySelector("#loginButton"),
   workerName: document.querySelector("#workerName"),
   shiftStatus: document.querySelector("#shiftStatus"),
   clockButton: document.querySelector("#clockButton"),
@@ -231,17 +259,33 @@ const els = {
 let language = localStorage.getItem(LANGUAGE_KEY) || "en";
 let session = { role: "guest", workerId: null };
 let adminWeekOffset = 0;
-let state = normalizeState(JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"));
+let state = loadState();
 saveState();
 
+function loadState() {
+  const existing = localStorage.getItem(STORAGE_KEY);
+  if (existing) return normalizeState(JSON.parse(existing));
+
+  return {
+    workers: [],
+    events: [],
+    requests: [],
+    overrides: []
+  };
+}
+
 function normalizeState(saved) {
-  const workers = saved.workers || [];
+  const workers = (saved.workers || []).filter((worker) => {
+    return !(DEMO_WORKER_IDS.has(worker.id) && /^100[1-8]$/.test(worker.pin || ""));
+  });
   const workerIds = new Set(workers.map((worker) => worker.id));
   return {
     workers,
     events: (saved.events || []).filter((event) => workerIds.has(event.workerId)),
     requests: (saved.requests || []).filter((request) => workerIds.has(request.workerId)),
-    overrides: dedupeOverrides((saved.overrides || []).filter((override) => workerIds.has(override.workerId)))
+    overrides: (saved.overrides || [])
+      .filter((override) => workerIds.has(override.workerId))
+      .map(normalizeOverride)
   };
 }
 
@@ -251,25 +295,35 @@ function saveState() {
 
 function t(key, values = {}) {
   const template = translations[language][key] || translations.en[key] || key;
-  return Object.entries(values).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, value), template);
+  return Object.entries(values).reduce((text, [name, value]) => {
+    return text.replaceAll(`{${name}}`, value);
+  }, template);
 }
 
 function applyTranslations() {
   document.documentElement.lang = language === "km" ? "km" : "en";
   document.title = t("appTitle");
-  document.querySelectorAll("[data-i18n]").forEach((node) => { node.textContent = t(node.dataset.i18n); });
-  document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => { node.placeholder = t(node.dataset.i18nPlaceholder); });
+  document.querySelectorAll("[data-i18n]").forEach((node) => {
+    node.textContent = t(node.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
+    node.placeholder = t(node.dataset.i18nPlaceholder);
+  });
   els.languageToggle.textContent = t("languageToggle");
   els.languageToggle.setAttribute("aria-label", t("switchLanguage"));
   els.logoutButton.title = t("signOutLabel");
   els.logoutButton.setAttribute("aria-label", t("signOutLabel"));
-  document.querySelectorAll("[data-nav-label]").forEach((node) => node.setAttribute("aria-label", t(node.dataset.navLabel)));
+  document.querySelectorAll("[data-nav-label]").forEach((node) => {
+    node.setAttribute("aria-label", t(node.dataset.navLabel));
+  });
   if (session.role === "worker") renderWorker();
   if (session.role === "admin") renderAdmin();
 }
 
 function showScreen(name) {
-  [els.loginScreen, els.adminLoginScreen, els.workerScreen, els.adminScreen].forEach((screen) => screen.classList.remove("active"));
+  [els.loginScreen, els.adminLoginScreen, els.workerScreen, els.adminScreen].forEach((screen) => {
+    screen.classList.remove("active");
+  });
   document.querySelector(`#${name}`).classList.add("active");
   els.logoutButton.classList.toggle("visible", name === "workerScreen" || name === "adminScreen");
 }
@@ -279,7 +333,15 @@ function login(event) {
   els.pinError.textContent = "";
   const pin = els.pinInput.value.trim();
   const worker = state.workers.find((person) => person.pin === pin);
-  if (!worker) return showFieldError(els.pinInput, els.pinError, t("incorrectPin"));
+  if (!worker) {
+    els.pinError.textContent = t("incorrectPin");
+    els.pinInput.select();
+    els.pinInput.setCustomValidity(t("incorrectPin"));
+    els.pinInput.reportValidity();
+    els.pinInput.setCustomValidity("");
+    return;
+  }
+
   session = { role: "worker", workerId: worker.id };
   els.pinInput.value = "";
   renderWorker();
@@ -292,13 +354,35 @@ function createAccount(event) {
   els.createError.textContent = "";
   const name = els.newWorkerName.value.trim();
   const pin = els.newWorkerPin.value.trim();
-  if (!name) return showFieldError(els.newWorkerName, els.createError, t("enterName"));
-  if (!/^\d{4,}$/.test(pin)) return showFieldError(els.newWorkerPin, els.createError, t("fourNumbers"));
-  if (state.workers.some((worker) => worker.pin === pin)) {
-    showToast(t("pinTaken"));
-    return showFieldError(els.newWorkerPin, els.createError, t("pinTaken"));
+  if (!name) {
+    els.createError.textContent = t("enterName");
+    els.newWorkerName.setCustomValidity(t("enterName"));
+    els.newWorkerName.reportValidity();
+    els.newWorkerName.setCustomValidity("");
+    return;
   }
-  const worker = { id: crypto.randomUUID(), name, pin, createdAt: new Date().toISOString() };
+  if (!/^\d{4,}$/.test(pin)) {
+    els.createError.textContent = t("fourNumbers");
+    els.newWorkerPin.setCustomValidity(t("fourNumbers"));
+    els.newWorkerPin.reportValidity();
+    els.newWorkerPin.setCustomValidity("");
+    return;
+  }
+  if (state.workers.some((worker) => worker.pin === pin)) {
+    els.createError.textContent = t("pinTaken");
+    showToast(t("pinTaken"));
+    els.newWorkerPin.setCustomValidity(t("pinTaken"));
+    els.newWorkerPin.reportValidity();
+    els.newWorkerPin.setCustomValidity("");
+    return;
+  }
+
+  const worker = {
+    id: crypto.randomUUID(),
+    name,
+    pin,
+    createdAt: new Date().toISOString()
+  };
   state.workers.push(worker);
   saveState();
   session = { role: "worker", workerId: worker.id };
@@ -310,8 +394,14 @@ function createAccount(event) {
 async function adminLogin(event) {
   event.preventDefault();
   els.adminError.textContent = "";
-  if (await sha256Hex(els.adminPasscode.value) !== ADMIN_PASSCODE_HASH) {
-    return showFieldError(els.adminPasscode, els.adminError, t("incorrectAdmin"));
+  const passcodeHash = await sha256Hex(els.adminPasscode.value);
+  if (passcodeHash !== ADMIN_PASSCODE_HASH) {
+    els.adminError.textContent = t("incorrectAdmin");
+    els.adminPasscode.select();
+    els.adminPasscode.setCustomValidity(t("incorrectAdmin"));
+    els.adminPasscode.reportValidity();
+    els.adminPasscode.setCustomValidity("");
+    return;
   }
   session = { role: "admin", workerId: null };
   els.adminPasscode.value = "";
@@ -319,32 +409,25 @@ async function adminLogin(event) {
   showScreen("adminScreen");
 }
 
-function showFieldError(input, output, message) {
-  output.textContent = message;
-  input.select?.();
-  input.setCustomValidity(message);
-  input.reportValidity();
-  input.setCustomValidity("");
-}
-
-async function sha256Hex(value) {
-  const bytes = new TextEncoder().encode(value);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(hashBuffer), (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
 function logout() {
   session = { role: "guest", workerId: null };
-  showScreen(isAdminRoute() ? "adminLoginScreen" : "loginScreen");
+  if (isAdminRoute()) {
+    showScreen("adminLoginScreen");
+  } else {
+    showScreen("loginScreen");
+  }
 }
 
 function workerEvents(workerId) {
-  return state.events.filter((event) => event.workerId === workerId).sort((a, b) => new Date(a.at) - new Date(b.at));
+  return state.events
+    .filter((event) => event.workerId === workerId)
+    .sort((a, b) => new Date(a.at) - new Date(b.at));
 }
 
 function currentOpenShift(workerId) {
+  const events = workerEvents(workerId);
   let open = null;
-  for (const event of workerEvents(workerId)) {
+  for (const event of events) {
     if (event.type === "in") open = event;
     if (event.type === "out") open = null;
   }
@@ -353,20 +436,17 @@ function currentOpenShift(workerId) {
 
 function clockToggle() {
   if (!requireOnline()) return;
-  const open = currentOpenShift(session.workerId);
-  state.events.push({ id: crypto.randomUUID(), workerId: session.workerId, type: open ? "out" : "in", at: new Date().toISOString(), pending: false });
+  const workerId = session.workerId;
+  const open = currentOpenShift(workerId);
+  state.events.push({
+    id: crypto.randomUUID(),
+    workerId,
+    type: open ? "out" : "in",
+    at: minuteIso(),
+    pending: false
+  });
   saveState();
   renderWorker();
-}
-
-function getCambodiaDateParts(date) {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: PHNOM_PENH_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
-  return Object.fromEntries(parts.map((part) => [part.type, part.value]));
-}
-
-function cambodiaDateKey(value) {
-  const parts = getCambodiaDateParts(new Date(value));
-  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 function weekStartCambodia(now = new Date()) {
@@ -384,126 +464,114 @@ function weekStartForOffset(weekOffset = 0) {
 }
 
 function dateKeyFromUtcDate(date) {
-  return [date.getUTCFullYear(), String(date.getUTCMonth() + 1).padStart(2, "0"), String(date.getUTCDate()).padStart(2, "0")].join("-");
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0")
+  ].join("-");
 }
 
-function currentWeekDateKeys() {
-  return weekDateKeys(0);
-}
-
-function weekDateKeys(weekOffset = 0) {
+function weeklyShifts(workerId, weekOffset = 0) {
   const start = weekStartForOffset(weekOffset);
-  return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(start);
-    date.setUTCDate(start.getUTCDate() + index);
-    return dateKeyFromUtcDate(date);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 7);
+  const startKey = dateKeyFromUtcDate(start);
+  const endKey = dateKeyFromUtcDate(end);
+  return shiftsForWorker(workerId).filter((shift) => {
+    const dateKey = shift.date || cambodiaDateKey(shift.inAt);
+    return dateKey >= startKey && dateKey < endKey;
   });
 }
 
 function rawShiftsForWorker(workerId) {
-  const shifts = [];
-  let open = null;
-  for (const event of workerEvents(workerId)) {
-    if (event.type === "in") open = event;
-    if (event.type === "out" && open) {
-      shifts.push({ workerId, date: cambodiaDateKey(open.at), inAt: open.at, outAt: event.at, pending: open.pending || event.pending });
-      open = null;
-    }
-  }
-  if (open) shifts.push({ workerId, date: cambodiaDateKey(open.at), inAt: open.at, outAt: null, pending: open.pending });
-  return shifts;
+  return buildRawShifts(state.events, workerId);
 }
 
 function shiftsForWorker(workerId) {
-  const approvedOverrides = dedupeOverrides(state.overrides.filter((override) => override.workerId === workerId));
-  const overrideDates = new Set(approvedOverrides.map((override) => override.date));
-  const rawShifts = rawShiftsForWorker(workerId).filter((shift) => !overrideDates.has(shift.date));
-  const manualShifts = approvedOverrides.map((override) => ({ workerId, date: override.date, inAt: override.inAt, outAt: override.outAt, pending: false, manual: true, requestId: override.requestId }));
-  return [...rawShifts, ...manualShifts].sort((a, b) => new Date(b.inAt) - new Date(a.inAt));
-}
-
-function overrideDateKey(override) {
-  return `${override.workerId}|${override.date}`;
-}
-
-function overrideId(workerId, date) {
-  return `override-${workerId}-${date}`;
-}
-
-function overrideSortTime(override) {
-  return new Date(override.approvedAt || override.reviewedAt || override.createdAt || 0).getTime();
-}
-
-function dedupeOverrides(overrides = []) {
-  const byDate = new Map();
-  overrides.forEach((override) => {
-    if (!override.workerId || !override.date || !override.inAt || !override.outAt) return;
-    const key = overrideDateKey(override);
-    const current = byDate.get(key);
-    if (!current || overrideSortTime(override) >= overrideSortTime(current)) {
-      byDate.set(key, { ...override, id: overrideId(override.workerId, override.date) });
-    }
-  });
-  return Array.from(byDate.values());
-}
-
-function weeklyShifts(workerId, weekOffset = 0) {
-  const dates = new Set(weekDateKeys(weekOffset));
-  return shiftsForWorker(workerId).filter((shift) => dates.has(shift.date || cambodiaDateKey(shift.inAt)));
+  return shiftsWithOverrides(state.events, state.overrides, workerId);
 }
 
 function durationMs(shift) {
-  return Math.max(0, (shift.outAt ? new Date(shift.outAt) : new Date()) - new Date(shift.inAt));
+  return intervalDurationMs(shift.inAt, shift.outAt || new Date());
 }
 
 function formatDuration(ms) {
   const minutes = Math.floor(ms / 60000);
-  return t("duration", { hours: Math.floor(minutes / 60), minutes: String(minutes % 60).padStart(2, "0") });
+  const hours = Math.floor(minutes / 60);
+  return t("duration", {
+    hours,
+    minutes: String(minutes % 60).padStart(2, "0")
+  });
 }
 
 function formatDateTime(value) {
-  return new Intl.DateTimeFormat(language === "km" ? "km-KH" : "en-US", { timeZone: PHNOM_PENH_TZ, weekday: "short", hour: "numeric", minute: "2-digit", month: "short", day: "numeric" }).format(new Date(value));
-}
-
-function formatTimeOnly(value) {
-  return new Intl.DateTimeFormat(language === "km" ? "km-KH" : "en-US", { timeZone: PHNOM_PENH_TZ, hour: "numeric", minute: "2-digit" }).format(new Date(value));
-}
-
-function shortDateLabel(dateKey) {
-  return new Intl.DateTimeFormat(language === "km" ? "km-KH" : "en-US", { timeZone: PHNOM_PENH_TZ, weekday: "short", month: "short", day: "numeric" }).format(new Date(`${dateKey}T00:00:00+07:00`));
-}
-
-function weekRangeLabel(weekOffset = 0) {
-  const dates = weekDateKeys(weekOffset);
-  return `${shortDateLabel(dates[0])} - ${shortDateLabel(dates[6])}`;
-}
-
-function timeInputValue(value) {
-  return new Intl.DateTimeFormat("en-GB", { timeZone: PHNOM_PENH_TZ, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(value));
+  return new Intl.DateTimeFormat(language === "km" ? "km-KH" : "en-US", {
+    timeZone: PHNOM_PENH_TZ,
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    month: "short",
+    day: "numeric"
+  }).format(new Date(value));
 }
 
 function renderWorker() {
   const worker = state.workers.find((person) => person.id === session.workerId);
-  if (!worker) return logout();
   const open = currentOpenShift(worker.id);
   const shifts = weeklyShifts(worker.id);
   const total = shifts.reduce((sum, shift) => sum + durationMs(shift), 0);
+
   els.workerName.textContent = worker.name;
   els.shiftStatus.textContent = open ? t("clockedInSince", { time: formatDateTime(open.at) }) : t("notClockedIn");
   els.clockButton.textContent = open ? t("clockOut") : t("clockIn");
   els.clockButton.classList.toggle("out", Boolean(open));
   els.syncNote.textContent = navigator.onLine ? t("onlineSync") : t("offlineSync");
   els.weekTotal.textContent = formatDuration(total);
-  els.workerShiftList.innerHTML = shifts.length ? shifts.map(renderShiftItem).join("") : `<div class="item small">${t("noShifts")}</div>`;
+
+  els.workerShiftList.innerHTML = shifts.length
+    ? shifts.map(renderShiftItem).join("")
+    : `<div class="item small">${t("noShifts")}</div>`;
+
   const requests = state.requests.filter((request) => request.workerId === worker.id);
-  els.workerRequestList.innerHTML = requests.length ? requests.map(renderWorkerRequest).join("") : `<div class="item small">${t("noRequests")}</div>`;
+  els.workerRequestList.innerHTML = requests.length
+    ? requests.map(renderWorkerRequest).join("")
+    : `<div class="item small">${t("noRequests")}</div>`;
 }
 
 function renderShiftItem(shift) {
   const status = shift.outAt ? formatDuration(durationMs(shift)) : t("inProgress");
-  const out = shift.outAt ? formatDateTime(shift.outAt) : t("now");
   const savedLabel = shift.manual ? t("adminApproved") : shift.pending ? t("pendingSync") : t("saved");
-  return `<div class="item"><div class="item-row"><strong>${status}</strong><span class="small">${savedLabel}</span></div><div class="small">${formatDateTime(shift.inAt)} - ${out}</div></div>`;
+  const review = intervalNeedsReview(shift);
+  return `
+    <div class="item">
+      <div class="item-row"><strong>${status}</strong><span class="small">${savedLabel}</span></div>
+      <div class="small">${formatIntervalRange(shift)}</div>
+      ${review ? `<div class="review-note">${t("reviewIntervalHelp")}</div>` : ""}
+    </div>
+  `;
+}
+
+function intervalNeedsReview(shift) {
+  if (!shift?.outAt) return false;
+  return isCrossDayInterval(shift.inAt, shift.outAt) || isLongInterval(shift.inAt, shift.outAt);
+}
+
+function formatIntervalRange(shift) {
+  if (!shift?.outAt) return `${formatDateTime(shift.inAt)} - ${t("now")}`;
+  if (isCrossDayInterval(shift.inAt, shift.outAt)) {
+    return `${formatDateTime(shift.inAt)} - ${formatDateTime(shift.outAt)}`;
+  }
+  return `${formatTimeOnly(shift.inAt)} - ${formatTimeOnly(shift.outAt)}`;
+}
+
+function renderIntervalSummary(shift) {
+  const review = intervalNeedsReview(shift);
+  return `
+    <div class="interval-summary ${review ? "needs-review" : ""}">
+      <span>${formatIntervalRange(shift)}</span>
+      ${review ? `<span class="review-pill" title="${t("reviewIntervalHelp")}">${t("reviewInterval")}</span>` : ""}
+    </div>
+  `;
 }
 
 function submitRequest(event) {
@@ -512,22 +580,48 @@ function submitRequest(event) {
   const hasStart = Boolean(els.requestStart.value);
   const hasEnd = Boolean(els.requestEnd.value);
   const reason = els.requestText.value.trim();
-  if (!hasStart && !hasEnd && !reason) return showFieldError(els.requestText, els.requestText, t("addTimeOrNote"));
+  if (!hasStart && !hasEnd && !reason) {
+    els.requestText.setCustomValidity(t("addTimeOrNote"));
+    els.requestText.reportValidity();
+    els.requestText.setCustomValidity("");
+    return;
+  }
+
   const inAt = hasStart ? cambodiaDateTimeToIso(els.requestDate.value, els.requestStart.value) : null;
   const outAt = hasEnd ? cambodiaDateTimeToIso(els.requestDate.value, els.requestEnd.value) : null;
-  if (inAt && outAt && new Date(outAt) <= new Date(inAt)) return showFieldError(els.requestEnd, els.requestEnd, t("outAfterIn"));
-  state.requests.push({ id: crypto.randomUUID(), workerId: session.workerId, date: els.requestDate.value, requestedStart: els.requestStart.value, requestedEnd: els.requestEnd.value, inAt, outAt, text: reason, status: "pending", createdAt: new Date().toISOString() });
+  if (inAt && outAt && new Date(outAt) <= new Date(inAt)) {
+    els.requestEnd.setCustomValidity(t("outAfterIn"));
+    els.requestEnd.reportValidity();
+    els.requestEnd.setCustomValidity("");
+    return;
+  }
+
+  state.requests.push({
+    id: crypto.randomUUID(),
+    workerId: session.workerId,
+    date: els.requestDate.value,
+    requestedStart: els.requestStart.value,
+    requestedEnd: els.requestEnd.value,
+    inAt,
+    outAt,
+    text: reason,
+    status: "pending",
+    createdAt: new Date().toISOString()
+  });
   els.requestForm.reset();
   saveState();
   renderWorker();
 }
 
-function cambodiaDateTimeToIso(date, time) {
-  return new Date(`${date}T${time}:00+07:00`).toISOString();
-}
-
 function renderWorkerRequest(request) {
-  return `<div class="item"><div class="item-row"><strong>${request.date}</strong><span class="small">${t(request.status)}</span></div><div class="small">${requestChangeSummary(request)}</div><div>${escapeHtml(request.text)}</div></div>`;
+  const change = requestChangeSummary(request);
+  return `
+    <div class="item">
+      <div class="item-row"><strong>${request.date}</strong><span class="small">${t(request.status)}</span></div>
+      <div class="small">${change}</div>
+      <div>${escapeHtml(request.text)}</div>
+    </div>
+  `;
 }
 
 function renderAdmin() {
@@ -537,32 +631,61 @@ function renderAdmin() {
     els.adminRequestList.innerHTML = `<div class="item small">${t("noPending")}</div>`;
     return;
   }
-  els.adminWorkerList.innerHTML = `${weekControls}${state.workers.map(renderAdminWorker).join("")}`;
+
+  const rows = state.workers.map((worker) => {
+    const shifts = weeklyShifts(worker.id, adminWeekOffset);
+    const total = shifts.reduce((sum, shift) => sum + durationMs(shift), 0);
+    const open = currentOpenShift(worker.id);
+    return `
+      <details class="item worker-details">
+        <summary>
+          <div class="item-row">
+            <strong>${worker.name}</strong>
+            <span class="status-pill">${open ? t("working") : t("out")}</span>
+          </div>
+          <div class="item-row">
+            <span class="small">${adminWeekOffset === 0 ? t("thisWeek") : t("weekOf", { range: weekRangeLabel(adminWeekOffset) })}</span>
+            <strong>${formatDuration(total)}</strong>
+          </div>
+          <div class="item-row details-labels">
+            <span class="small show-label">${t("showDays")}</span>
+            <span class="small hide-label">${t("hideDays")}</span>
+          </div>
+        </summary>
+        <div class="day-list">${renderDailyRows(worker.id, adminWeekOffset)}</div>
+        <div class="delete-zone" data-delete-zone="${worker.id}">
+          <button class="delete-start" data-delete-start="${worker.id}" type="button">${t("deleteWorker")}</button>
+          <div class="delete-confirm hidden" data-delete-confirm="${worker.id}">
+            <p class="small">${t("deleteConfirm", { name: escapeHtml(worker.name) })}</p>
+            <input class="delete-slider" data-delete-slider="${worker.id}" type="range" min="0" max="100" value="0" aria-label="${t("confirmDeleteLabel", { name: escapeHtml(worker.name) })}">
+            <div class="actions">
+              <button class="deny" data-delete-cancel="${worker.id}" type="button">${t("cancel")}</button>
+              <button class="delete-final" data-delete-final="${worker.id}" type="button" disabled>${t("delete")}</button>
+            </div>
+          </div>
+        </div>
+      </details>
+    `;
+  });
+  els.adminWorkerList.innerHTML = `${weekControls}${rows.join("")}`;
+
   const pending = state.requests.filter((request) => request.status === "pending");
-  els.adminRequestList.innerHTML = pending.length ? pending.map(renderAdminRequest).join("") : `<div class="item small">${t("noPending")}</div>`;
+  els.adminRequestList.innerHTML = pending.length
+    ? pending.map(renderAdminRequest).join("")
+    : `<div class="item small">${t("noPending")}</div>`;
 }
 
 function renderWeekControls() {
-  return `<div class="item week-nav"><button class="ghost week-button" data-week-nav="-1" type="button">${t("previousWeek")}</button><div><strong>${adminWeekOffset === 0 ? t("currentWeek") : t("weekOf", { range: weekRangeLabel(adminWeekOffset) })}</strong><div class="small">${weekRangeLabel(adminWeekOffset)}</div></div><button class="ghost week-button" data-week-nav="1" type="button" ${adminWeekOffset === 0 ? "disabled" : ""}>${t("nextWeek")}</button></div>`;
-}
-
-function renderAdminWorker(worker) {
-  const shifts = weeklyShifts(worker.id, adminWeekOffset);
-  const total = shifts.reduce((sum, shift) => sum + durationMs(shift), 0);
-  const open = currentOpenShift(worker.id);
-  const weekLabel = adminWeekOffset === 0 ? t("thisWeek") : t("weekOf", { range: weekRangeLabel(adminWeekOffset) });
-  return `<details class="item worker-details"><summary><div class="item-row"><strong>${escapeHtml(worker.name)}</strong><span class="status-pill">${open ? t("working") : t("out")}</span></div><div class="item-row"><span class="small">${weekLabel}</span><strong>${formatDuration(total)}</strong></div><div class="item-row details-labels"><span class="small show-label">${t("showDays")}</span><span class="small hide-label">${t("hideDays")}</span></div></summary><div class="day-list">${renderDailyRows(worker.id, adminWeekOffset)}</div><div class="delete-zone"><button class="delete-start" data-delete-start="${worker.id}" type="button">${t("deleteWorker")}</button><div class="delete-confirm hidden" data-delete-confirm="${worker.id}"><p class="small">${t("deleteConfirm", { name: escapeHtml(worker.name) })}</p><input class="delete-slider" data-delete-slider="${worker.id}" type="range" min="0" max="100" value="0" aria-label="${t("confirmDeleteLabel", { name: escapeHtml(worker.name) })}"><div class="actions"><button class="deny" data-delete-cancel="${worker.id}" type="button">${t("cancel")}</button><button class="delete-final" data-delete-final="${worker.id}" type="button" disabled>${t("delete")}</button></div></div></div></details>`;
-}
-
-function renderDailyRows(workerId, weekOffset = 0) {
-  return weekDateKeys(weekOffset).map((date) => {
-    const shifts = weeklyShifts(workerId, weekOffset).filter((shift) => shift.date === date);
-    const total = shifts.reduce((sum, shift) => sum + durationMs(shift), 0);
-    const times = shifts.length ? shifts.map((shift) => `${formatTimeOnly(shift.inAt)} - ${shift.outAt ? formatTimeOnly(shift.outAt) : t("now")}`).join(", ") : t("noTime");
-    const editShift = shifts.find((shift) => shift.outAt) || shifts[0];
-    const hasManual = state.overrides.some((override) => override.workerId === workerId && override.date === date);
-    return `<div class="day-card"><div class="day-row editable-day-row"><strong>${shortDateLabel(date)}</strong><div class="inline-time-edit"><input type="time" data-time-edit="start" data-worker-id="${workerId}" data-date="${date}" value="${editShift?.inAt ? timeInputValue(editShift.inAt) : ""}" aria-label="${t("clockInField")} ${shortDateLabel(date)}"><input type="time" data-time-edit="end" data-worker-id="${workerId}" data-date="${date}" value="${editShift?.outAt ? timeInputValue(editShift.outAt) : ""}" aria-label="${t("clockOutField")} ${shortDateLabel(date)}"></div><strong>${formatDuration(total)}</strong></div><div class="manual-edit"><span class="small">${times}</span><button class="approve compact-button" data-time-save="true" data-worker-id="${workerId}" data-date="${date}" type="button">${t("saveTimes")}</button><button class="deny compact-button" data-time-clear="true" data-worker-id="${workerId}" data-date="${date}" type="button" ${hasManual ? "" : "disabled"}>${t("clearManual")}</button></div></div>`;
-  }).join("");
+  return `
+    <div class="item week-nav">
+      <button class="ghost week-button" data-week-nav="-1" type="button">${t("previousWeek")}</button>
+      <div>
+        <strong>${adminWeekOffset === 0 ? t("currentWeek") : t("weekOf", { range: weekRangeLabel(adminWeekOffset) })}</strong>
+        <div class="small">${weekRangeLabel(adminWeekOffset)}</div>
+      </div>
+      <button class="ghost week-button" data-week-nav="1" type="button" ${adminWeekOffset === 0 ? "disabled" : ""}>${t("nextWeek")}</button>
+    </div>
+  `;
 }
 
 function renderAdminRequest(request) {
@@ -570,11 +693,21 @@ function renderAdminRequest(request) {
   if (!worker) return "";
   const preview = buildApprovedShift(request);
   const canApprove = Boolean(preview);
-  const previewText = preview ? t("willBecome", { time: `${formatTimeOnly(preview.inAt)} - ${formatTimeOnly(preview.outAt)} (${formatDuration(new Date(preview.outAt) - new Date(preview.inAt))})` }) : t("needsShift");
-  return `<div class="item"><div class="item-row"><strong>${escapeHtml(worker.name)}</strong><span class="small">${request.date}</span></div><div class="small">${requestChangeSummary(request)}</div><div class="small">${previewText}</div><div>${escapeHtml(request.text)}</div><div class="actions"><button class="approve" data-request-action="approved" data-request-id="${request.id}" ${canApprove ? "" : "disabled"}>${t("approveAction")}</button><button class="deny" data-request-action="denied" data-request-id="${request.id}">${t("denyAction")}</button></div></div>`;
+  return `
+    <div class="item">
+      <div class="item-row"><strong>${worker.name}</strong><span class="small">${request.date}</span></div>
+      <div class="small">${requestChangeSummary(request)}</div>
+      <div class="small">${preview ? t("willBecome", { time: `${formatIntervalRange(preview)} (${formatDuration(intervalDurationMs(preview.inAt, preview.outAt))})` }) : t("needsShift")}</div>
+      <div>${escapeHtml(request.text)}</div>
+      <div class="actions">
+        <button class="approve" data-request-action="approved" data-request-id="${request.id}" ${canApprove ? "" : "disabled"}>${t("approveAction")}</button>
+        <button class="deny" data-request-action="denied" data-request-id="${request.id}">${t("denyAction")}</button>
+      </div>
+    </div>
+  `;
 }
 
-function handleAdminClick(event) {
+function handleAdminRequestClick(event) {
   const weekButton = event.target.closest("[data-week-nav]");
   if (weekButton) {
     adminWeekOffset += Number(weekButton.dataset.weekNav);
@@ -582,34 +715,75 @@ function handleAdminClick(event) {
     renderAdmin();
     return;
   }
+
   const saveTime = event.target.closest("[data-time-save]");
-  if (saveTime) return saveManualTimes(saveTime.dataset.workerId, saveTime.dataset.date);
+  if (saveTime) {
+    saveManualTimes(saveTime.dataset.workerId, saveTime.dataset.date);
+    return;
+  }
+
   const clearTime = event.target.closest("[data-time-clear]");
-  if (clearTime) return clearManualTimes(clearTime.dataset.workerId, clearTime.dataset.date);
+  if (clearTime) {
+    clearManualTimes(clearTime.dataset.workerId, clearTime.dataset.date);
+    return;
+  }
+
+  const addInterval = event.target.closest("[data-interval-add]");
+  if (addInterval) {
+    addManualIntervalRow(addInterval);
+    return;
+  }
+
+  const removeInterval = event.target.closest("[data-interval-remove]");
+  if (removeInterval) {
+    removeManualIntervalRow(removeInterval);
+    return;
+  }
+
   const deleteStart = event.target.closest("[data-delete-start]");
-  if (deleteStart) return showDeleteConfirm(deleteStart.dataset.deleteStart);
+  if (deleteStart) {
+    showDeleteConfirm(deleteStart.dataset.deleteStart);
+    return;
+  }
+
   const deleteCancel = event.target.closest("[data-delete-cancel]");
-  if (deleteCancel) return hideDeleteConfirm(deleteCancel.dataset.deleteCancel);
+  if (deleteCancel) {
+    hideDeleteConfirm(deleteCancel.dataset.deleteCancel);
+    return;
+  }
+
   const deleteFinal = event.target.closest("[data-delete-final]");
-  if (deleteFinal && !deleteFinal.disabled) return deleteWorker(deleteFinal.dataset.deleteFinal);
+  if (deleteFinal && !deleteFinal.disabled) {
+    deleteWorker(deleteFinal.dataset.deleteFinal);
+    return;
+  }
+
   const button = event.target.closest("[data-request-action]");
   if (!button) return;
-  reviewRequest(button.dataset.requestId, button.dataset.requestAction);
-}
-
-function reviewRequest(requestId, status) {
   if (!requireOnline()) return;
-  const request = state.requests.find((item) => item.id === requestId);
+  const request = state.requests.find((item) => item.id === button.dataset.requestId);
   if (!request) return;
   const approvedShift = buildApprovedShift(request);
-  if (status === "approved" && !approvedShift) return;
-  request.status = status;
+  if (button.dataset.requestAction === "approved" && !approvedShift) return;
+  request.status = button.dataset.requestAction;
   request.reviewedAt = new Date().toISOString();
-  if (status === "approved") {
-    state.overrides = state.overrides.filter((override) => override.workerId !== request.workerId || override.date !== request.date);
-    state.overrides.push({ id: overrideId(request.workerId, request.date), requestId: request.id, workerId: request.workerId, date: request.date, inAt: approvedShift.inAt, outAt: approvedShift.outAt, approvedAt: request.reviewedAt });
+  if (request.status === "approved") {
+    state.overrides = state.overrides.filter((override) => {
+      return override.workerId !== request.workerId || override.date !== request.date;
+    });
+    state.overrides.push({
+      id: crypto.randomUUID(),
+      requestId: request.id,
+      workerId: request.workerId,
+      date: request.date,
+      intervals: [{
+        id: crypto.randomUUID(),
+        inAt: approvedShift.inAt,
+        outAt: approvedShift.outAt
+      }],
+      approvedAt: request.reviewedAt
+    });
   }
-  state.overrides = dedupeOverrides(state.overrides);
   saveState();
   renderAdmin();
 }
@@ -617,22 +791,31 @@ function reviewRequest(requestId, status) {
 function handleAdminInput(event) {
   const slider = event.target.closest("[data-delete-slider]");
   if (!slider) return;
-  const button = document.querySelector(`[data-delete-final="${slider.dataset.deleteSlider}"]`);
+  const workerId = slider.dataset.deleteSlider;
+  const button = document.querySelector(`[data-delete-final="${workerId}"]`);
   button.disabled = Number(slider.value) < 100;
 }
 
 function showDeleteConfirm(workerId) {
-  document.querySelector(`[data-delete-confirm="${workerId}"]`).classList.remove("hidden");
-  document.querySelector(`[data-delete-start="${workerId}"]`).classList.add("hidden");
-  document.querySelector(`[data-delete-slider="${workerId}"]`).value = "0";
-  document.querySelector(`[data-delete-final="${workerId}"]`).disabled = true;
+  const panel = document.querySelector(`[data-delete-confirm="${workerId}"]`);
+  const start = document.querySelector(`[data-delete-start="${workerId}"]`);
+  const slider = document.querySelector(`[data-delete-slider="${workerId}"]`);
+  const final = document.querySelector(`[data-delete-final="${workerId}"]`);
+  panel.classList.remove("hidden");
+  start.classList.add("hidden");
+  slider.value = "0";
+  final.disabled = true;
 }
 
 function hideDeleteConfirm(workerId) {
-  document.querySelector(`[data-delete-confirm="${workerId}"]`).classList.add("hidden");
-  document.querySelector(`[data-delete-start="${workerId}"]`).classList.remove("hidden");
-  document.querySelector(`[data-delete-slider="${workerId}"]`).value = "0";
-  document.querySelector(`[data-delete-final="${workerId}"]`).disabled = true;
+  const panel = document.querySelector(`[data-delete-confirm="${workerId}"]`);
+  const start = document.querySelector(`[data-delete-start="${workerId}"]`);
+  const slider = document.querySelector(`[data-delete-slider="${workerId}"]`);
+  const final = document.querySelector(`[data-delete-final="${workerId}"]`);
+  panel.classList.add("hidden");
+  start.classList.remove("hidden");
+  slider.value = "0";
+  final.disabled = true;
 }
 
 function deleteWorker(workerId) {
@@ -647,30 +830,91 @@ function deleteWorker(workerId) {
 
 function saveManualTimes(workerId, date) {
   if (!requireOnline()) return;
-  const startInput = document.querySelector(`[data-time-edit="start"][data-worker-id="${workerId}"][data-date="${date}"]`);
-  const endInput = document.querySelector(`[data-time-edit="end"][data-worker-id="${workerId}"][data-date="${date}"]`);
-  if (!startInput || !endInput) return;
-  const start = startInput.value;
-  const end = endInput.value;
-  if (!start || !end) {
-    const message = t("manualNeedsBoth");
-    showToast(message);
-    return showFieldError(start ? endInput : startInput, start ? endInput : startInput, message);
+  const rows = manualIntervalRows(workerId, date);
+  const result = buildManualIntervals(rows.map(readManualIntervalRow));
+  if (!result.ok) {
+    reportManualIntervalError(rows[result.row] || rows[0], result.code);
+    return;
   }
-  const inAt = cambodiaDateTimeToIso(date, start);
-  const outAt = cambodiaDateTimeToIso(date, end);
-  if (new Date(outAt) <= new Date(inAt)) return showFieldError(endInput, endInput, t("outAfterIn"));
-  state.overrides = state.overrides.filter((override) => override.workerId !== workerId || override.date !== date);
-  state.overrides.push({ id: overrideId(workerId, date), requestId: `manual-${workerId}-${date}`, workerId, date, inAt, outAt, approvedAt: new Date().toISOString(), manualEdit: true });
-  state.overrides = dedupeOverrides(state.overrides);
+
+  state.overrides = state.overrides.filter((override) => {
+    return override.workerId !== workerId || override.date !== date;
+  });
+  state.overrides.push({
+    id: crypto.randomUUID(),
+    requestId: `manual-${crypto.randomUUID()}`,
+    workerId,
+    date,
+    intervals: result.intervals.map((interval) => ({
+      id: interval.id || crypto.randomUUID(),
+      inAt: interval.inAt,
+      outAt: interval.outAt
+    })),
+    approvedAt: new Date().toISOString(),
+    manualEdit: true
+  });
   saveState();
   showToast(t("manualSaved"));
   renderAdmin();
 }
 
+function manualIntervalRows(workerId, date) {
+  return Array.from(document.querySelectorAll(`[data-interval-row][data-worker-id="${workerId}"][data-date="${date}"]`));
+}
+
+function readManualIntervalRow(row) {
+  return {
+    id: row.dataset.intervalId || "",
+    startDate: row.querySelector('[data-interval-field="start-date"]')?.value || "",
+    startTime: row.querySelector('[data-interval-field="start-time"]')?.value || "",
+    endDate: row.querySelector('[data-interval-field="end-date"]')?.value || "",
+    endTime: row.querySelector('[data-interval-field="end-time"]')?.value || ""
+  };
+}
+
+function reportManualIntervalError(row, code) {
+  const message = code === "overlap"
+    ? t("intervalOverlap")
+    : code === "order"
+      ? t("outAfterIn")
+      : t("manualNeedsBoth");
+  const target = row?.querySelector('[data-interval-field="end-time"]')
+    || row?.querySelector('[data-interval-field="start-time"]');
+  if (target) {
+    target.setCustomValidity(message);
+    target.reportValidity();
+    target.setCustomValidity("");
+  }
+  showToast(message);
+}
+
+function addManualIntervalRow(button) {
+  const editor = button.closest("[data-interval-editor]");
+  const list = editor?.querySelector("[data-interval-list]");
+  if (!list) return;
+  const index = list.querySelectorAll("[data-interval-row]").length;
+  list.insertAdjacentHTML("beforeend", renderIntervalEditRow(button.dataset.workerId, button.dataset.date, null, index));
+}
+
+function removeManualIntervalRow(button) {
+  const row = button.closest("[data-interval-row]");
+  const list = row?.parentElement;
+  if (!row || !list) return;
+  const rows = list.querySelectorAll("[data-interval-row]");
+  if (rows.length <= 1) {
+    row.querySelectorAll("input").forEach((input) => {
+      input.value = "";
+    });
+    return;
+  }
+  row.remove();
+}
+
 function clearManualTimes(workerId, date) {
   if (!requireOnline()) return;
-  state.overrides = state.overrides.filter((override) => override.workerId !== workerId || override.date !== date);
+  state.overrides = state.overrides.filter((override) => {
+    return override.workerId !== workerId || override.date !== date;
+  });
   saveState();
   renderAdmin();
 }
@@ -686,19 +930,142 @@ function buildApprovedShift(request) {
   const current = findShiftForDate(request.workerId, request.date);
   const inAt = request.inAt || current?.inAt;
   const outAt = request.outAt || current?.outAt;
-  if (!inAt || !outAt || new Date(outAt) <= new Date(inAt)) return null;
+  if (!inAt || !outAt) return null;
+  if (new Date(outAt) <= new Date(inAt)) return null;
   return { inAt, outAt };
 }
 
 function findShiftForDate(workerId, date) {
-  return shiftsForWorker(workerId).find((shift) => shift.date === date) || rawShiftsForWorker(workerId).find((shift) => shift.date === date);
+  return shiftsForWorker(workerId).find((shift) => shift.date === date)
+    || rawShiftsForWorker(workerId).find((shift) => shift.date === date);
+}
+
+function formatTimeOnly(value) {
+  return new Intl.DateTimeFormat(language === "km" ? "km-KH" : "en-US", {
+    timeZone: PHNOM_PENH_TZ,
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
+function renderDailyRows(workerId, weekOffset = 0) {
+  return weekDateKeys(weekOffset).map((date) => {
+    const shifts = weeklyShifts(workerId, weekOffset).filter((shift) => shift.date === date);
+    const total = shifts.reduce((sum, shift) => sum + durationMs(shift), 0);
+    const summaries = shifts.length
+      ? shifts.map(renderIntervalSummary).join("")
+      : `<span>${t("noTime")}</span>`;
+    const editIntervals = editableIntervalsForDay(workerId, date, shifts);
+    const hasManual = state.overrides.some((override) => override.workerId === workerId && override.date === date);
+    return `
+      <div class="day-card">
+        <div class="day-row">
+          <strong>${shortDateLabel(date)}</strong>
+          <div class="interval-summary-list">${summaries}</div>
+          <strong>${formatDuration(total)}</strong>
+        </div>
+        <div class="manual-edit" data-interval-editor data-worker-id="${workerId}" data-date="${date}">
+          <div class="manual-edit-head">
+            <span class="small">${t("manualIntervals")}</span>
+            ${hasManual ? `<span class="small">${t("adminApproved")}</span>` : ""}
+          </div>
+          <div class="interval-edit-list" data-interval-list>
+            ${editIntervals.map((interval, index) => renderIntervalEditRow(workerId, date, interval, index)).join("")}
+          </div>
+          <div class="actions manual-actions">
+            <button class="ghost compact-button" data-interval-add="true" data-worker-id="${workerId}" data-date="${date}" type="button">${t("addInterval")}</button>
+            <button class="approve compact-button" data-time-save="true" data-worker-id="${workerId}" data-date="${date}" type="button">${t("saveTimes")}</button>
+            <button class="deny compact-button" data-time-clear="true" data-worker-id="${workerId}" data-date="${date}" type="button" ${hasManual ? "" : "disabled"}>${t("clearManual")}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function editableIntervalsForDay(workerId, date, shifts) {
+  const override = state.overrides.find((item) => item.workerId === workerId && item.date === date);
+  const intervals = override ? overrideIntervals(override) : shifts.filter((shift) => shift.outAt);
+  return intervals.length ? intervals : [null];
+}
+
+function renderIntervalEditRow(workerId, date, interval, index) {
+  const startDate = interval?.inAt ? dateInputValue(interval.inAt) : date;
+  const endDate = interval?.outAt ? dateInputValue(interval.outAt) : date;
+  return `
+    <div class="interval-edit-row" data-interval-row data-worker-id="${workerId}" data-date="${date}" data-interval-id="${interval?.id || ""}">
+      <label>
+        <span>${t("startDate")}</span>
+        <input type="date" data-interval-field="start-date" value="${startDate}" aria-label="${t("startDate")} ${shortDateLabel(date)} ${index + 1}">
+      </label>
+      <label>
+        <span>${t("clockInField")}</span>
+        <input type="time" data-interval-field="start-time" value="${interval?.inAt ? timeInputValue(interval.inAt) : ""}" aria-label="${t("clockInField")} ${shortDateLabel(date)} ${index + 1}">
+      </label>
+      <label>
+        <span>${t("endDate")}</span>
+        <input type="date" data-interval-field="end-date" value="${endDate}" aria-label="${t("endDate")} ${shortDateLabel(date)} ${index + 1}">
+      </label>
+      <label>
+        <span>${t("clockOutField")}</span>
+        <input type="time" data-interval-field="end-time" value="${interval?.outAt ? timeInputValue(interval.outAt) : ""}" aria-label="${t("clockOutField")} ${shortDateLabel(date)} ${index + 1}">
+      </label>
+      <button class="deny compact-button" data-interval-remove="true" type="button">${t("removeInterval")}</button>
+    </div>
+  `;
+}
+
+function currentWeekDateKeys() {
+  return weekDateKeys(0);
+}
+
+function weekDateKeys(weekOffset = 0) {
+  const start = weekStartForOffset(weekOffset);
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(start);
+    date.setUTCDate(start.getUTCDate() + index);
+    return dateKeyFromUtcDate(date);
+  });
+}
+
+function weekRangeLabel(weekOffset = 0) {
+  const dates = weekDateKeys(weekOffset);
+  return `${shortDateLabel(dates[0])} - ${shortDateLabel(dates[6])}`;
+}
+
+function shortDateLabel(dateKey) {
+  const date = new Date(`${dateKey}T00:00:00+07:00`);
+  return new Intl.DateTimeFormat(language === "km" ? "km-KH" : "en-US", {
+    timeZone: PHNOM_PENH_TZ,
+    weekday: "short",
+    month: "short",
+    day: "numeric"
+  }).format(date);
 }
 
 function switchTab(scope, tabName) {
-  document.querySelectorAll(`[data-${scope}-tab]`).forEach((tab) => tab.classList.toggle("active", tab.dataset[`${scope}Tab`] === tabName));
+  document.querySelectorAll(`[data-${scope}-tab]`).forEach((tab) => {
+    tab.classList.toggle("active", tab.dataset[`${scope}Tab`] === tabName);
+  });
   const panels = scope === "worker" ? ["hoursTab", "requestTab"] : ["teamTab", "requestsTab"];
   panels.forEach((id) => document.querySelector(`#${id}`).classList.remove("active"));
   document.querySelector(`#${tabName}Tab`).classList.add("active");
+}
+
+function escapeHtml(value) {
+  return String(value || "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  }[char]));
+}
+
+async function sha256Hex(value) {
+  const bytes = new TextEncoder().encode(value);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(hashBuffer), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function setAuthMode(mode) {
@@ -715,6 +1082,12 @@ function showToast(message) {
   showToast.timer = window.setTimeout(hideToast, 3500);
 }
 
+function requireOnline() {
+  if (navigator.onLine) return true;
+  showToast(t("offlineSync"));
+  return false;
+}
+
 function hideToast() {
   els.toast.classList.add("hidden");
 }
@@ -723,12 +1096,6 @@ function toggleLanguage() {
   language = language === "en" ? "km" : "en";
   localStorage.setItem(LANGUAGE_KEY, language);
   applyTranslations();
-}
-
-function requireOnline() {
-  if (navigator.onLine) return true;
-  showToast(t("offlineSync"));
-  return false;
 }
 
 function applyRemoteState(json) {
@@ -741,10 +1108,6 @@ function applyRemoteState(json) {
   if (session.role === "admin") renderAdmin();
 }
 
-function escapeHtml(value) {
-  return String(value || "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
-}
-
 function isAdminRoute() {
   const path = window.location.pathname.replace(/\/$/, "");
   return path === "/admin" || path.endsWith("/admin.html");
@@ -753,21 +1116,40 @@ function isAdminRoute() {
 els.signInForm.addEventListener("submit", login);
 els.createAccountForm.addEventListener("submit", createAccount);
 els.adminLoginForm.addEventListener("submit", adminLogin);
-els.pinInput.addEventListener("keydown", (event) => { if (event.key === "Enter") login(event); });
+els.pinInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") login(event);
+});
 els.logoutButton.addEventListener("click", logout);
 els.clockButton.addEventListener("click", clockToggle);
 els.requestForm.addEventListener("submit", submitRequest);
-els.adminRequestList.addEventListener("click", handleAdminClick);
-els.adminWorkerList.addEventListener("click", handleAdminClick);
+els.adminRequestList.addEventListener("click", handleAdminRequestClick);
+els.adminWorkerList.addEventListener("click", handleAdminRequestClick);
 els.adminWorkerList.addEventListener("input", handleAdminInput);
 els.languageToggle.addEventListener("click", toggleLanguage);
-document.querySelectorAll("[data-worker-tab]").forEach((tab) => tab.addEventListener("click", () => switchTab("worker", tab.dataset.workerTab)));
-document.querySelectorAll("[data-admin-tab]").forEach((tab) => tab.addEventListener("click", () => switchTab("admin", tab.dataset.adminTab)));
-document.querySelectorAll("[data-auth-mode]").forEach((tab) => tab.addEventListener("click", () => setAuthMode(tab.dataset.authMode)));
-window.addEventListener("online", () => { state.events.forEach((event) => { event.pending = false; }); saveState(); if (session.role === "worker") renderWorker(); });
-window.addEventListener("offline", () => { if (session.role === "worker") renderWorker(); });
+
+document.querySelectorAll("[data-worker-tab]").forEach((tab) => {
+  tab.addEventListener("click", () => switchTab("worker", tab.dataset.workerTab));
+});
+document.querySelectorAll("[data-admin-tab]").forEach((tab) => {
+  tab.addEventListener("click", () => switchTab("admin", tab.dataset.adminTab));
+});
+document.querySelectorAll("[data-auth-mode]").forEach((tab) => {
+  tab.addEventListener("click", () => setAuthMode(tab.dataset.authMode));
+});
+
+window.addEventListener("online", () => {
+  state.events.forEach((event) => {
+    event.pending = false;
+  });
+  saveState();
+  if (session.role === "worker") renderWorker();
+});
+window.addEventListener("offline", () => {
+  if (session.role === "worker") renderWorker();
+});
 window.addEventListener("team-time-clock-state-updated", (event) => applyRemoteState(event.detail?.json));
 window.__teamTimeClockApplyRemoteState = applyRemoteState;
+
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.getRegistrations().then((registrations) => {
     registrations.forEach((registration) => registration.unregister());
@@ -776,5 +1158,6 @@ if ("serviceWorker" in navigator) {
 if ("caches" in window) {
   caches.keys().then((keys) => keys.forEach((key) => caches.delete(key)));
 }
+
 showScreen(isAdminRoute() ? "adminLoginScreen" : "loginScreen");
 applyTranslations();
