@@ -15,12 +15,15 @@ import {
   shiftsWithOverrides,
   timeInputValue
 } from "./time-logic.mjs";
+import {
+  markWorkerDeleted,
+  normalizeTimeClockState
+} from "./state-logic.mjs";
 
 const STORAGE_KEY = "team-time-clock-v1";
 const LANGUAGE_KEY = "team-time-clock-language";
 const ADMIN_PASSCODE_HASH = "ab798d4c1bb849f872f170f871945d50160df91b5e4e4e9ee2cce31074d0731f";
 
-const DEMO_WORKER_IDS = new Set(["w1", "w2", "w3", "w4", "w5", "w6", "w7", "w8"]);
 const translations = {
   en: {
     brand: "Cambodia Team",
@@ -266,26 +269,14 @@ function loadState() {
   const existing = localStorage.getItem(STORAGE_KEY);
   if (existing) return normalizeState(JSON.parse(existing));
 
-  return {
-    workers: [],
-    events: [],
-    requests: [],
-    overrides: []
-  };
+  return normalizeState({});
 }
 
 function normalizeState(saved) {
-  const workers = (saved.workers || []).filter((worker) => {
-    return !(DEMO_WORKER_IDS.has(worker.id) && /^100[1-8]$/.test(worker.pin || ""));
-  });
-  const workerIds = new Set(workers.map((worker) => worker.id));
+  const normalized = normalizeTimeClockState(saved);
   return {
-    workers,
-    events: (saved.events || []).filter((event) => workerIds.has(event.workerId)),
-    requests: (saved.requests || []).filter((request) => workerIds.has(request.workerId)),
-    overrides: (saved.overrides || [])
-      .filter((override) => workerIds.has(override.workerId))
-      .map(normalizeOverride)
+    ...normalized,
+    overrides: normalized.overrides.map(normalizeOverride)
   };
 }
 
@@ -820,10 +811,7 @@ function hideDeleteConfirm(workerId) {
 
 function deleteWorker(workerId) {
   if (!requireOnline()) return;
-  state.workers = state.workers.filter((worker) => worker.id !== workerId);
-  state.events = state.events.filter((event) => event.workerId !== workerId);
-  state.requests = state.requests.filter((request) => request.workerId !== workerId);
-  state.overrides = state.overrides.filter((override) => override.workerId !== workerId);
+  state = markWorkerDeleted(state, workerId);
   saveState();
   renderAdmin();
 }

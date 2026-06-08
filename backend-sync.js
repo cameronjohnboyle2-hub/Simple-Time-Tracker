@@ -8,66 +8,16 @@
   let remoteStateJson = "";
   let saveRemoteState = null;
   let localDirty = false;
+  const stateLogic = import("./state-logic.mjs");
 
-  function parseState(json) {
-    try {
-      return json ? JSON.parse(json) : {};
-    } catch {
-      return {};
-    }
+  async function normalizeJson(json) {
+    const { normalizeStateJson } = await stateLogic;
+    return normalizeStateJson(json);
   }
 
-  function mergeById(localItems = [], remoteItems = []) {
-    const byId = new Map();
-    remoteItems.forEach((item) => byId.set(item.id, item));
-    localItems.forEach((item) => byId.set(item.id, { ...byId.get(item.id), ...item }));
-    return Array.from(byId.values());
-  }
-
-  function overrideId(workerId, date) {
-    return `override-${workerId}-${date}`;
-  }
-
-  function overrideTime(override) {
-    return new Date(override.approvedAt || override.reviewedAt || override.createdAt || 0).getTime();
-  }
-
-  function mergeOverrides(localItems = [], remoteItems = []) {
-    const byDate = new Map();
-    [...remoteItems, ...localItems].forEach((override) => {
-      if (!override?.workerId || !override?.date || !override?.inAt || !override?.outAt) return;
-      const key = `${override.workerId}|${override.date}`;
-      const current = byDate.get(key);
-      if (!current || overrideTime(override) >= overrideTime(current)) {
-        byDate.set(key, {
-          ...current,
-          ...override,
-          id: overrideId(override.workerId, override.date)
-        });
-      }
-    });
-    return Array.from(byDate.values());
-  }
-
-  function normalizeJson(json) {
-    const state = parseState(json);
-    return JSON.stringify({
-      workers: state.workers || [],
-      events: state.events || [],
-      requests: state.requests || [],
-      overrides: mergeOverrides(state.overrides || [], [])
-    });
-  }
-
-  function mergeStateJson(localJson, remoteJson) {
-    const localState = parseState(localJson);
-    const remoteState = parseState(remoteJson);
-    return JSON.stringify({
-      workers: mergeById(localState.workers, remoteState.workers),
-      events: mergeById(localState.events, remoteState.events),
-      requests: mergeById(localState.requests, remoteState.requests),
-      overrides: mergeOverrides(localState.overrides, remoteState.overrides)
-    });
+  async function mergeStateJson(localJson, remoteJson) {
+    const { mergeStateJson: mergeJson } = await stateLogic;
+    return mergeJson(localJson, remoteJson);
   }
 
   function notifyStateUpdated(json) {
@@ -122,17 +72,17 @@
         }
       };
 
-      firestore.onSnapshot(stateRef, (snapshot) => {
+      firestore.onSnapshot(stateRef, async (snapshot) => {
         remoteReady = true;
         const remoteJson = snapshot.data()?.json || "";
         const localJson = originalGetItem(STORAGE_KEY) || "";
 
         if (localDirty && localJson) {
-          const mergedJson = remoteJson ? mergeStateJson(localJson, remoteJson) : normalizeJson(localJson);
+          const mergedJson = remoteJson ? await mergeStateJson(localJson, remoteJson) : await normalizeJson(localJson);
           remoteStateJson = mergedJson;
           localDirty = false;
           saveRemoteState(mergedJson);
-          if (normalizeJson(localJson) !== mergedJson) {
+          if (await normalizeJson(localJson) !== mergedJson) {
             originalSetItem(STORAGE_KEY, mergedJson);
             notifyStateUpdated(mergedJson);
           }
@@ -140,18 +90,19 @@
         }
 
         if (!remoteJson && localJson) {
-          remoteStateJson = localJson;
-          saveRemoteState(localJson);
+          const normalizedLocalJson = await normalizeJson(localJson);
+          remoteStateJson = normalizedLocalJson;
+          saveRemoteState(normalizedLocalJson);
           return;
         }
 
         if (remoteJson && remoteJson !== localJson) {
-          const mergedJson = mergeStateJson(localJson, remoteJson);
+          const mergedJson = await mergeStateJson(localJson, remoteJson);
           remoteStateJson = mergedJson;
-          if (normalizeJson(remoteJson) !== mergedJson) {
+          if (await normalizeJson(remoteJson) !== mergedJson) {
             saveRemoteState(mergedJson);
           }
-          if (normalizeJson(localJson) !== mergedJson) {
+          if (await normalizeJson(localJson) !== mergedJson) {
             originalSetItem(STORAGE_KEY, mergedJson);
           }
           originalSetItem(REMOTE_SOURCE_KEY, new Date().toISOString());
