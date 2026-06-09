@@ -72,14 +72,12 @@ export function normalizeTimeClockState(saved = {}) {
 
   const deleted = new Set(deletedWorkerIds);
   const activeWorkers = workers.filter((worker) => worker?.id && !deleted.has(worker.id));
-  const activeWorkerIds = new Set(activeWorkers.map((worker) => worker.id));
-  const belongsToActiveWorker = (item) => activeWorkerIds.has(item?.workerId);
 
   return {
     workers: activeWorkers,
-    events: asArray(saved.events).filter(belongsToActiveWorker),
-    requests: asArray(saved.requests).filter(belongsToActiveWorker),
-    overrides: asArray(saved.overrides).filter(belongsToActiveWorker),
+    events: asArray(saved.events),
+    requests: asArray(saved.requests),
+    overrides: asArray(saved.overrides),
     deletedWorkerIds: unique(Array.from(deleted)),
     cleanupVersions: unique(cleanupVersions)
   };

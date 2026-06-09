@@ -32,9 +32,9 @@ describe("state cleanup and deletion sync", () => {
     });
 
     assert.deepEqual(state.workers.map((worker) => worker.name), ["Pharith Chin", "Mery Vuth"]);
-    assert.deepEqual(state.events.map((event) => event.id), ["real-event"]);
-    assert.deepEqual(state.requests.map((request) => request.id), ["real-request"]);
-    assert.deepEqual(state.overrides.map((override) => override.id), ["real-override"]);
+    assert.deepEqual(state.events.map((event) => event.id), ["real-event", "test-event"]);
+    assert.deepEqual(state.requests.map((request) => request.id), ["real-request", "test-request"]);
+    assert.deepEqual(state.overrides.map((override) => override.id), ["real-override", "test-override"]);
     assert.deepEqual(state.deletedWorkerIds, ["test"]);
     assert.equal(state.cleanupVersions.includes(ACTIVE_PROFILE_CLEANUP_VERSION), true);
   });
@@ -51,7 +51,7 @@ describe("state cleanup and deletion sync", () => {
     assert.deepEqual(state.deletedWorkerIds, []);
   });
 
-  it("marks deleted workers with a tombstone and removes their related data", () => {
+  it("marks deleted workers with a tombstone without discarding clock data", () => {
     const state = markWorkerDeleted({
       cleanupVersions: cleanupDone,
       workers: [
@@ -71,9 +71,9 @@ describe("state cleanup and deletion sync", () => {
     }, "delete-me");
 
     assert.deepEqual(state.workers.map((worker) => worker.id), ["keep"]);
-    assert.deepEqual(state.events.map((event) => event.id), ["keep-event"]);
-    assert.deepEqual(state.requests, []);
-    assert.deepEqual(state.overrides, []);
+    assert.deepEqual(state.events.map((event) => event.id), ["keep-event", "deleted-event"]);
+    assert.deepEqual(state.requests.map((request) => request.id), ["deleted-request"]);
+    assert.deepEqual(state.overrides.map((override) => override.id), ["deleted-override"]);
     assert.deepEqual(state.deletedWorkerIds, ["delete-me"]);
   });
 
@@ -94,7 +94,7 @@ describe("state cleanup and deletion sync", () => {
     const merged = JSON.parse(mergeStateJson(local, remote));
 
     assert.deepEqual(merged.workers.map((worker) => worker.id), ["keep"]);
-    assert.deepEqual(merged.events, []);
+    assert.deepEqual(merged.events, [{ id: "old-event", workerId: "old-test" }]);
     assert.deepEqual(merged.deletedWorkerIds, ["old-test"]);
   });
 
