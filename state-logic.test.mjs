@@ -98,6 +98,26 @@ describe("state cleanup and deletion sync", () => {
     assert.deepEqual(merged.deletedWorkerIds, ["old-test"]);
   });
 
+  it("preserves legacy clock events that do not have ids", () => {
+    const legacyEvent = {
+      workerId: "keep",
+      type: "in",
+      at: "2026-06-02T02:00:00.000Z"
+    };
+    const local = JSON.stringify({
+      cleanupVersions: cleanupDone,
+      workers: [{ id: "keep", name: "Pharith Chin" }]
+    });
+    const remote = JSON.stringify({
+      workers: [{ id: "keep", name: "Pharith Chin" }],
+      events: [legacyEvent]
+    });
+
+    const merged = JSON.parse(mergeStateJson(local, remote));
+
+    assert.deepEqual(merged.events, [legacyEvent]);
+  });
+
   it("keeps legacy demo profiles out of normalized state", () => {
     const state = normalizeTimeClockState({
       cleanupVersions: cleanupDone,

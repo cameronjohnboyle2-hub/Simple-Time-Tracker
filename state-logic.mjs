@@ -24,13 +24,31 @@ function isDemoWorker(worker) {
   return DEMO_WORKER_IDS.has(worker?.id) && /^100[1-8]$/.test(worker?.pin || "");
 }
 
+function itemKey(item, index) {
+  if (item?.id) return `id:${item.id}`;
+  const parts = [
+    item?.workerId,
+    item?.type,
+    item?.at,
+    item?.date,
+    item?.inAt,
+    item?.outAt,
+    item?.requestedStart,
+    item?.requestedEnd,
+    item?.createdAt,
+    item?.text
+  ].filter(Boolean);
+  return parts.length ? `legacy:${parts.join("|")}` : `index:${index}`;
+}
+
 function mergeById(localItems = [], remoteItems = []) {
   const byId = new Map();
-  asArray(remoteItems).forEach((item) => {
-    if (item?.id) byId.set(item.id, item);
+  asArray(remoteItems).forEach((item, index) => {
+    byId.set(itemKey(item, index), item);
   });
-  asArray(localItems).forEach((item) => {
-    if (item?.id) byId.set(item.id, { ...byId.get(item.id), ...item });
+  asArray(localItems).forEach((item, index) => {
+    const key = itemKey(item, index);
+    byId.set(key, { ...byId.get(key), ...item });
   });
   return Array.from(byId.values());
 }
