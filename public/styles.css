@@ -561,3 +561,8 @@ button:disabled {
     flex-direction: column;
   }
 }
+
+.demo-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px; background: var(--green-soft); border-bottom: 1px solid var(--line); }
+.demo-banner p { margin: 0; font-size: 13px; line-height: 1.5; }
+.demo-banner button { flex-shrink: 0; padding: 8px 12px; min-height: 40px; }
+select { font: inherit; width: 100%; min-height: 48px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: white; }
