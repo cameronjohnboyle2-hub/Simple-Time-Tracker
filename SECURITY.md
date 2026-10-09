@@ -8,6 +8,6 @@ Demo changes use a new local-storage namespace; the app never loads the old oper
 
 The development server binds `127.0.0.1` and serves only `public/`, checks decoded paths and resolved filesystem boundaries, rejects non-read methods, and sends additional response headers. GitHub Pages receives only that directory, with its HTML-level Content Security Policy. The local server's extra headers are not a claim about Pages response headers.
 
-This source change cannot restrict any legacy deployed database. Production closure requires inspecting the deployed rules and authentication configuration, deliberately closing unauthorized access, and validating denial cases with synthetic data. Do not reintroduce a shared credential/state document or infer authorization from a frontend view.
+Production use requires a separate authentication and authorization design enforced by the backend, with synthetic denial tests and deployment verification. The demo's open view selector does not grant a production role. Its local behavior is not a validation of any external application's database configuration.
 
 For a security concern, use a private channel already established with the maintainer. Do not post real worker records, credential values, or production exports in a public issue.

@@ -44,4 +44,4 @@ The included regression suite covers interval handling, saved-state validation, 
 
 This repository snapshot is not a production employee-record system. A live tracker requires trusted authentication, enforced per-worker/admin authorization, and a planned data migration. Removing a client integration does not change deployed database rules. See [SECURITY.md](SECURITY.md).
 
-The original repository history needs a separate privacy decision before any history rewrite or replacement. A source license has not yet been selected. No study protocols, participant records, or production exports are included in this demo snapshot.
+A source license has not yet been selected. Owner review of rights, attribution, and historical material precedes the final release. No study protocols, participant records, or production exports are included in this demo snapshot.
