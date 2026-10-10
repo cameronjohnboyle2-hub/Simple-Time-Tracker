@@ -30,7 +30,8 @@ function boot({ cachedValue = null, storageBlocked = false } = {}) {
     document: { querySelector, querySelectorAll: () => [], createElement: element, documentElement: {}, title: "" },
     window: { location: { pathname: "/" }, clearTimeout() {}, setTimeout: () => 0 }
   };
-  vm.runInNewContext(`${source}\nglobalThis.bootState = state;`, context, { timeout: 1000 });
+  // Allow a cold CI runner to initialize Intl while keeping script execution bounded.
+  vm.runInNewContext(`${source}\nglobalThis.bootState = state;`, context, { timeout: 5000 });
   return { context, reads, writes, elements };
 }
 
